@@ -2,140 +2,641 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h> // isspace
 
 #include "database.h"
 #include "repl.h"
 
-
-
 /* HELPER FUNCTIONS */
-// Add a string to an array, re-allocating if necessary
-void addStrToArray(char*** array, int* size, int* capacity, const char* value) {
-  if (*size >= *capacity) {
-    *capacity *= 2;
-    *array = realloc(*array, (*capacity) * sizeof(char*));
+/* FREE MEMORY */
+void freeCommand(Command* command) {
+  if (!command) return;
 
-    if (!*array) {
-      printf("realloc failed.\n");
-      exit(EXIT_FAILURE);
+  // generic
+  if (command->tableName) free(command->tableName);
+
+  // create
+  if (command->c_colPairs) {
+    for (int i = 0; i < command->c_numColPairs; i++) {
+      free(command->c_colPairs[i].colName);
+      free(command->c_colPairs[i].colDef);
     }
+    free(command->c_colPairs);
   }
-  // (*array)[(*size)++] = strdup(value);
-  size_t len = strlen(value) + 1;
-  char* copy = calloc(len, 1);
-  strcpy(copy, value);
-  (*array)[(*size)++] = copy;
+
+  // insert
+  if (command->i_colNames) {
+    for (int i = 0; i < command->i_numColNames; i++) {
+      free(command->i_colNames[i]);
+    }
+    free(command->i_colNames);
+  }
+
+
+  if (command->i_colValueRows) {
+    for (int i = 0; i < command->i_numValueRows; i++) {
+
+      for (int j = 0; j < command->i_numColNames; j++) {
+        free(command->i_colValueRows[i][j]);
+      }
+
+      free(command->i_colValueRows[i]);
+    }
+    free(command->i_colValueRows);
+  }
+
+  // final
+  free(command);
 }
 
-// print a string and its length
-void prStr(char* str) {
-  printf("str %s length %ld\n", str, strlen(str));
+/* ERRORS */
+char* writeError(char* str) {
+	char* errMsg = malloc(strlen(str) + 1);
+	strcpy(errMsg, str);
+	return errMsg;
+} 
+
+/* */
+char* replaceEscapedQuote(char* str) {
+	size_t len = strlen(str);
+
+	char* result = calloc(len + 1, 1);
+	char* dst = result;
+
+	for (char* src = str; *src; src++) {
+		if (*src == '\'' && *(src + 1) == '\'') {
+			*dst = '\'';
+			src++;
+		} else {
+			*dst = *src;
+		}
+		dst++;
+	}
+	*dst = '\0';
+	return result;
 }
 
-// remove leading and trailing whitespace
-void trim(char* str) {
-  char* start = str;
+/* VALIDATION FUNCTIONS */
+// Check whether the number of ( matches ) and ' matches ' (not including inside quotes)
+bool checkBalancedParensAndQuotes(char* input) {
+	int openParens= 0;
+	bool inQuote = false;
 
-  while (*start == ' ') start++;
+	char* p = input;
 
-  if (start != str) {
-    memmove(str, start, strlen(start) + 1);
-  }
+	while (*p) {
+		// quote detected
+		if (*p == '\'') {
+			// skip '' which is escaped quote in SQL (PostgreSQL-style)
+			if (p[1] == '\'') p++;
+			// handle MySQL-style escaped quote \'
+			else if (p > input && *(p-1) == '\\') {}
+			else inQuote = !inQuote;
 
-  char* end = str + strlen(str) - 1;
-  while (end > str && (*end == ' ' || *end == '\n')) {
-    *end = '\0';
-    end--;
-  }
+		} else if (!inQuote) {
+			if (*p == '(') openParens++;
+			else if (*p == ')') openParens--;
+
+			if (openParens < 0) return false;
+		}
+	p++;
+	}
+	return openParens == 0 && !inQuote;
 }
 
-// convert string to column type
-ColumnType convertStrToColumnType(char* columnType) {
-  ColumnType type = COL_UNDEFINED;
+// Check whether the number of column names matches column definitions
+bool checkBalancedColNameToTypeInsideParens(char* input) {
+	int openParens= 0;
+	int numNames = 0;
+	int numTypes = 0;
 
-  if (strncmp(columnType, "INT", 3) == 0) {
-    type = COL_INT;
-  }
+	char* p = input;
 
-  if (strncmp(columnType, "BOOL", 4) == 0) {
-    type = COL_BOOL;
-  }
+	while (*p != '(') p++;
+	if (!p) return false;
 
-  if (strncmp(columnType, "VARCHAR(255)", 12) == 0) {
-    type = COL_STRING;
-  }
+	p++; // skip '('
+	openParens++;
 
-  return type;
+	while (openParens > 0) {
+		// move to colName
+		while (isspace(*p)) p++;
+
+		if (*p == ')') {
+			openParens--;
+			break;
+		}
+
+		// start of column definition
+		char* tokenStart = p;
+		bool inQuote = 0;
+
+		// move until comma or closing paren at top level
+		while (*p && (inQuote || (*p != ',' && *p != ')'))) {
+			if (*p == '\'') inQuote = !inQuote;
+			else if (*p == '(' && !inQuote) openParens++;
+			else if (*p == '(' && !inQuote) openParens--;
+			p++;
+		}
+
+		size_t len = p - tokenStart;
+		char* colDef = calloc(len + 1, 1);
+		strncpy(colDef, tokenStart, len);
+
+		// count number of space-separated tokens
+		int wordCount = 0;
+		char* tok = strtok(colDef, " \t\r\n");
+		while (tok) {
+			wordCount++;
+			tok = strtok(NULL, " \t\r\n");
+		}
+
+		free(colDef);
+
+		if (wordCount < 2) {
+			printf("Invalid column definition (needs name and type)\n");
+			return false;
+		}
+
+		if (*p == ',') p++; // skip comma
+	}
+
+	return true;
 }
 
-void parseCreate(char* input, Command* command) {
+/* PARSING FUNCTIONS */
+ColPair* createTable_extractColumns(char** pPtr, int* colCount) {
+	// copy address in original p to local variable p
+	char* p = *pPtr;
 
-  char* lessCommand = input + strlen("CREATE TABLE ");
-  trim(lessCommand);
+	// Find the start of columns
+	while (*p != '(') p++;
+	if (!p) NULL;
 
-  char* tableName = strtok(lessCommand, "(");
-  if (!tableName) {
-    printf("Empty table name\n");
-    command->type = CMD_ERROR;
-    return;
-  }
+	p++; // skip '('
 
-  trim(tableName);
+	int openParens = 1;
+	int capacity = 4;
+	int count = 0;
 
-  command->tableName = malloc(strlen(tableName) + 1);
-  strcpy(command->tableName, tableName);
+	ColPair* columns = malloc(capacity * sizeof(ColPair));
 
-  char** colNames = malloc(sizeof(char*) * COL_CAPACITY);
-  int colNamesLength = 0;
-  int colNamesCapacity = COL_CAPACITY;
+	while (openParens > 0) {
 
-  char** colTypes = malloc(sizeof(char*) * COL_CAPACITY);
-  int colTypesLength = 0;
-  int colTypesCapacity = COL_CAPACITY;
+		// skip leading whitespace
+		while (isspace(*p)) p++;
 
-  while (true) {
+		// if closing paren, finish
+		if (*p == ')') {
+			openParens--;
+			break;
+		}
 
-    char* colName = strtok(NULL, " \n");
-    if (!colName) break;
+		// start of column definition
+		char* tokenStart = p;
+		bool inQuote = 0;
 
-    trim(colName);
+		// move until comma or closing paren at top level
+		while (*p && (inQuote || (*p != ',' && openParens != 0))) {
 
-    addStrToArray(&colNames, &colNamesLength, &colNamesCapacity, colName);
+			if (*p == '\'') inQuote = !inQuote;
+			else if (*p == '(' && !inQuote) openParens++;
+			else if (*p == ')' && !inQuote) openParens--;
 
-    char* colType = strtok(NULL, " \n");
-    if (!colType) break;
+			// p++ -> fix a bug where no space left before final parens eg ( id INT)
+			// if p++ on final ) it will be included in the column definition erroneously
+			if (openParens > 0) p++;
+		}
 
-    trim(colType);
+		size_t len = p - tokenStart;
+		// colDef is eg "id INT NOT NULL PRIMARY KEY"
+		char* colDef = calloc(len + 1, 1);
+		strncpy(colDef, tokenStart, len);
 
-    char* end = colType + strlen(colType) - 1;
+		// "id"
+		char* name = strtok(colDef, " \t\r\n");
 
-    bool endsWithComma = (*end == ',');
+		// collect all remaining column definitions ie INT NOT NULL AUTO_INCREMENT PRIMARY KEY
+		// this process will replace any whitespace with spaces
+		size_t defLen = 0;
+		char* defParts[20];  // Arbitrary max token count
+		int i = 0;
 
-    if (endsWithComma) *end = '\0'; 
+		while (1) {
+			char* token = strtok(NULL, " \t\r\n");
+			if (!token) break;
+				defParts[i++] = token;
+				defLen += strlen(token) + 1;  // +1 for space
+		}
 
-    addStrToArray(&colTypes, &colTypesLength, &colTypesCapacity, colType);
+		// Join the remaining tokens into a single definition string
+		char* definition = malloc(defLen);
+		definition[0] = '\0';
 
-    if (!endsWithComma) break;
-  }
+		for (int j = 0; j < i; j++) {
+				strcat(definition, defParts[j]);
+				// add space between all except the end
+				if (j < i - 1) strcat(definition, " ");
+		}
 
-  if (colNamesLength != colTypesLength) {
-    printf("Column names and types mismatch!\n");
-    command->type = CMD_ERROR;
-    return;
-  }
+		if (count >= capacity) {
+			capacity *= 2;
+			columns = realloc(columns, capacity * sizeof(ColPair));
+		}
 
-  command->columnCount = colNamesLength;
-  command->columnNames = colNames;
+		columns[count].colName = strdup(name);
+		columns[count].colDef = strdup(definition);
+		count++;
 
-  command->columnTypes = malloc(sizeof(ColumnType) * colTypesLength);
+		free(colDef);
 
-  for (int i = 0; i < colTypesLength; i++) {
-    command->columnTypes[i] = convertStrToColumnType(colTypes[i]);
-    if (command->columnTypes[i] == COL_UNDEFINED) command->type = CMD_ERROR;
-    free(colTypes[i]);
-  }
-  free(colTypes);
+		if (*p == ',') p++; // skip comma
+	}
+	// move off block parens
+	p++;
 
+	// remove whitespace between end of parens and whatever comes next
+	// eg  ")  ," (multiple rows of columns) or ")   ;" (the end)
+	while (isspace(*p)) p++;
+
+	// return current position
+	*pPtr = p;
+	*colCount = count;
+	return columns;
+}
+
+char** insertInto_extractColumns(char** pPtr, int* colCount) {
+
+	// copy address in original p to local variable p
+	char* p = *pPtr;
+
+	// Find the start of columns
+	while (*p != '(') p++;
+	if (!p) NULL;
+
+	p++; // skip '('
+
+	int openParens = 1;
+	int capacity = 4;
+	int count = 0;
+
+	char** columns = malloc(capacity * sizeof(char*));
+
+	while (openParens > 0) {
+
+		// skip leading whitespace
+		while (isspace(*p)) p++;
+
+		// if closing paren, finish
+		if (*p == ')') {
+			openParens--;
+			break;
+		}
+
+		// start of column definition
+		char* tokenStart = p;
+		bool inQuote = 0;
+
+		// move until comma or closing paren at top level
+		while (*p && (inQuote || (*p != ',' && openParens != 0))) {
+
+			if (*p == '\'') inQuote = !inQuote;
+			else if (*p == '(' && !inQuote) openParens++;
+			else if (*p == ')' && !inQuote) openParens--;
+
+			// p++ -> fix a bug where no space left before final parens eg ( id INT)
+			// if p++ on final ) it will be included in the column definition erroneously
+			if (openParens > 0) p++;
+		}
+
+		size_t len = p - tokenStart;
+		char* col = calloc(len + 1, 1);
+		strncpy(col, tokenStart, len);
+
+		if (count >= capacity) {
+			capacity *= 2;
+			columns = realloc(columns, capacity * sizeof(char*));
+		}
+
+		// check for string, transform inner '' to '
+		if (*col == '\'' && strstr(col, "''")) {
+			char* result = replaceEscapedQuote(col);
+			strcpy(col, result);
+			len = strlen(col);
+			free(result);
+		}
+
+		// check for string, remove outer ' ... '
+		if (len >= 2 && col[0] == '\'' && col[len - 1] == '\'') {
+			memmove(col, col + 1, len - 2);
+			col[len - 2] = '\0';
+		}
+
+		columns[count] = col;
+
+		count++;
+
+		if (*p == ',') p++; // skip comma
+	}
+	// move off block parens
+	p++;
+
+	// remove whitespace between end of parens and whatever comes next
+	// eg  ")  ," (multiple rows of columns) or ")   ;" (the end)
+	while (isspace(*p)) p++;
+
+	// return current position
+	*pPtr = p;
+
+	*colCount = count;
+	return columns;
+}
+
+Where_Clause* where_extractColumns(char** pPtr, int* colCount) {
+	// copy address in original p to local variable p
+	char* p = *pPtr;
+
+	int count = 0;
+
+	Where_Clause* columns = malloc(3 * sizeof(char*));
+
+	/* COLUMN NAME */
+	while (isspace(*p)) p++;
+
+	// start of column definition
+	char* colNameStart = p;
+
+	if (*p == ';') {
+		// printf("no colName in where clause\n");
+		return NULL;
+	}
+
+	while (!isspace(*p) && !strchr("=<>!;", *p)) {
+		p++;
+	}
+
+	size_t colNameLen = p - colNameStart;
+	char* colName = calloc(colNameLen + 1, 1);
+	strncpy(colName, colNameStart, colNameLen);
+
+	columns->w_column = colName;
+
+	count++;
+
+	/* OPERATOR */
+	while (isspace(*p)) p++;
+	char* opStart = p;
+
+	if (*p == ';') {
+		// printf("no operator in where clause\n");
+		return NULL;
+	}
+
+	while (strchr("=<>!", *p)) p++;
+
+	size_t opLen = p - opStart;
+	char* operator = calloc(opLen + 1, 1);
+	strncpy(operator, opStart, opLen);
+
+	columns->w_operator = operator;
+
+	count++;
+
+	/* VALUE */
+	while (isspace(*p)) p++;
+
+	if (*p == ';') {
+		// printf("no colValue in where clause\n");
+		return NULL;
+	}
+
+	char* valStart = p;
+	while (*p != ';') p++;
+
+	size_t valLen = p - valStart;
+	char* val = calloc(valLen + 1, 1);
+	strncpy(val, valStart, valLen);
+
+	columns->w_value = val;
+
+	count++;
+
+	// return current position
+	*pPtr = p;
+
+	*colCount = count;
+	return columns;
+}
+
+char** select_extractColumns(char** pPtr, int* colCount) {
+
+	// copy address in original p to local variable p
+	char* p = *pPtr;
+
+	int capacity = 4;
+	int count = 0;
+
+	char** columns = malloc(capacity * sizeof(char*));
+
+	while (1) {
+
+		// skip leading whitespace
+		while (isspace(*p)) p++;
+
+		// start of column definition
+		char* tokenStart = p;
+
+		while (!isspace(*p) && *p != ',' && *p != ';') p++;
+
+		size_t len = p - tokenStart;
+		char* col = calloc(len + 1, 1);
+		strncpy(col, tokenStart, len);
+
+		if (strncmp(col, "FROM", 4) == 0) {
+			break;
+		}
+
+		if (*p == ';') {
+			printf("Where clause has finished\n");
+			break;
+		}
+
+		if (count >= capacity) {
+			capacity *= 2;
+			columns = realloc(columns, capacity * sizeof(char*));
+		}
+
+		columns[count] = col;
+
+		count++;
+
+		if (*p == ',') p++; // skip comma
+
+		if (!*p) break;
+	}
+
+	while (isspace(*p)) p++;
+
+	// return current position
+	*pPtr = p;
+
+	*colCount = count;
+	return columns;
+}
+
+// Extracts the first string after a command
+char* extractTableName(char** pPtr) {
+	// copy address in original p to local variable p
+	char* p = *pPtr;
+
+	while (isspace(*p)) p++;
+	char* start = p;
+	while (!isspace(*p) && *p != '(' && *p != ';') p++;
+	char* end = p;
+
+	size_t len = end - start;
+	char* tableName = malloc(len + 1);
+	memcpy(tableName, start, len);
+	tableName[len] = '\0';
+
+  // move pointer to first non-whitespace
+	while (isspace(*p)) p++;
+	
+	// update original pointer in the caller
+	*pPtr = p;
+	return tableName;
+}
+
+void parseCreate(char* input, Command* command) { 
+	/*
+		Pre-validation for:
+		- balanced parens
+		- balanced quotes
+		- columnName -> columnType matching
+		- ends in ; ( TODO? )
+	*/
+
+	if (!checkBalancedParensAndQuotes(input)) {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
+		return;
+	}
+
+	if (!checkBalancedColNameToTypeInsideParens(input)) {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: Mismatch in column names and types.");
+		return;	
+	}
+
+  char* p = input + strlen("CREATE TABLE");
+
+	command->tableName = extractTableName(&p);
+
+	int c_numColPairs;
+	command->c_colPairs = createTable_extractColumns(&p, &c_numColPairs);
+	command->c_numColPairs = c_numColPairs;
+}
+
+void parseInsert(char* input, Command* command) {
+	/*
+			Pre-validation for:
+			- balanced parens
+			- balanced quotes
+			- ends in ; ( TODO? )
+	*/
+
+	if (!checkBalancedParensAndQuotes(input)) {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
+		return;
+	}
+
+	char* p = input + strlen("INSERT INTO");
+
+	command->tableName = extractTableName(&p);
+
+	if (*p == 'V') {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: columns can't be skipped yet.");
+		return;
+	}
+
+	/* get the column names first */
+	int i_numColNames = 0;
+	char** i_colNames = insertInto_extractColumns(&p, &i_numColNames);
+	command->i_numColNames = i_numColNames;
+	command->i_colNames = i_colNames;
+
+	/* loop until ; to get all values*/
+	int colValueRowsCapacity = 4;
+	command->i_colValueRows = calloc(sizeof(char*), colValueRowsCapacity);
+
+	int i_numValueRows = 0;
+	while (*p && *p != ';') {
+		int valCount = 0;
+		char** colValueRow = insertInto_extractColumns(&p, &valCount);
+
+		if (i_numValueRows >= colValueRowsCapacity) {
+			colValueRowsCapacity *= 2;
+			command->i_colValueRows = realloc(command->i_colValueRows, colValueRowsCapacity * sizeof(char*));
+		}
+
+		command->i_colValueRows[i_numValueRows] = colValueRow;
+
+		i_numValueRows++;
+		p++;
+	}
+	command->i_numValueRows = i_numValueRows;
+}
+
+void parseSelect(char* input, Command* command) {
+	/*
+			Pre-validation for:
+			- balanced parens
+			- balanced quotes
+			- ends in ; ??
+	*/
+
+	if (!checkBalancedParensAndQuotes(input)) {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
+		return;
+	}
+
+	char* p = input + strlen("SELECT");
+
+	/* get the column names first */
+	int s_colNameCount = 0;
+	char** s_colNames = select_extractColumns(&p, &s_colNameCount);
+	command->s_colNameCount = s_colNameCount;
+	command->s_colNames = s_colNames;
+
+	if (s_colNameCount == 1 && (strcmp(s_colNames[0], "*") == 0)) {
+		command->s_all = true;
+	}
+
+	command->tableName = extractTableName(&p);
+
+	if (*p == ';') return;
+
+	// skip WHERE
+	char* WHERE = extractTableName(&p);
+	if (strcmp(WHERE, "WHERE") != 0) {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: where was WHERE?.");
+		free(WHERE);
+		return;
+	}
+	free(WHERE);
+
+	int w_clauseCount = 0;
+	command->s_whereClause = where_extractColumns(&p, &w_clauseCount);
+
+	if (!command->s_whereClause) {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: error in where clause.");
+		return;
+	}
 }
 
 char* getInput() {
@@ -153,7 +654,7 @@ char* getInput() {
 
   // remove all newlines
   for (int i = 0; input[i]; i++) {
-    if (input[i] == '\n') input[i] == ' ';
+    if (input[i] == '\n') input[i] = ' ';
   }
 
   // validation to ensure use input was not too long
@@ -170,11 +671,21 @@ Command* parseInput(char* input) {
     parseCreate(input, command);
   }
 
+  if (strncmp(input, "INSERT INTO ", 12) == 0) {
+    command->type = CMD_INSERT;
+    parseInsert(input, command);
+  }
+
+    if (strncmp(input, "SELECT ", 7) == 0) {
+    command->type = CMD_SELECT;
+    parseSelect(input, command);
+  }
+
   if (strncmp(input, "exit", 4) == 0) {
     command->type = CMD_EXIT;
   }
 
-  free(input);
+//   free(input);
 
   return command;
 }

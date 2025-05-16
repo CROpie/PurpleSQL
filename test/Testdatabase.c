@@ -23,29 +23,21 @@ void test_createTable_fail_no_tableName(void) {
   free(command);
 }
 
-
 // Test the createTable function
 void test_createTable_success_3cols(void) {
   
   char* tableName = "myTable";
   
-  char* columnNames[3] = {
-      "id",
-      "isDeleted",
-      "message"
-  };
-  
-  ColumnType columnTypes[3] = {
-      COL_INT,
-      COL_BOOL,
-      COL_STRING
+  ColPair columnPairs[] = {
+    { "id", "INT" },
+    { "isDeleted", "BOOL" },
+    { "message", "VARCHAR(255)" }
   };
 
   Command* command = calloc(1, sizeof(Command));
   command->tableName = tableName;
-  command->columnCount = 3;
-  command->columnNames = columnNames;
-  command->columnTypes = columnTypes;
+  command->c_numColPairs = 3;
+  command->c_colPairs = columnPairs;
 
   Table* table = createTable(command);
 

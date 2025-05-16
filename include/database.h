@@ -55,32 +55,42 @@ typedef struct {
 } Table;
 
 typedef struct {
-    char* column;
-    Operand op;
-    char* value;
-} Condition;
+  char* colName;
+  char* colDef;
+} ColPair;
+
+typedef struct {
+    char* w_column;
+    char* w_operator;
+    char* w_value;
+} Where_Clause;
 
 typedef struct {
     CommandType type;
     char* tableName;
 
     // CREATE
-    int columnCount;
-    char** columnNames;
-    ColumnType* columnTypes;
+    int c_numColPairs;
+    ColPair* c_colPairs;
 
     // INSERT
-    int valueCount;
-    char** insertValues;
+    int i_numColNames;
+    char** i_colNames;
+    int i_numValueRows;
+    char*** i_colValueRows;
 
     // SELECT
-    bool selectAll;
-    int selectCount;
-    char** selectColumns;
+    bool s_all;
+    int s_colNameCount;
+    char** s_colNames;
 
-    // WHERE (only one condition for now)
-   //  Condition* condition;
+    // WHERE
+    Where_Clause* s_whereClause;
+
+    // ERROR
+    char* e_message;
 } Command;
 
 Table* createTable(Command* command);
+
 #endif

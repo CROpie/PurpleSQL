@@ -8,5 +8,6 @@
 
 char* getInput();
 Command* parseInput(char* input);
+void freeCommand(Command* command);
 
 #endif

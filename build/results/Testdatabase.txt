@@ -1,12 +1,8 @@
-created type: 0
-created type: 1
-created type: 2
-test/Testdatabase.c:76:test_createTable_success_3cols:PASS
+test/Testdatabase.c:69:test_createTable_success_3cols:PASS
 No table name. Aborting.
 No column count. Aborting. 
-No column names. Aborting. 
-No column types. Aborting. 
-test/Testdatabase.c:77:test_createTable_fail_no_tableName:PASS
+No column definitions. Aborting. 
+test/Testdatabase.c:70:test_createTable_fail_no_tableName:PASS
 
 -----------------------
 2 Tests 0 Failures 0 Ignored 

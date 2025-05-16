@@ -12,22 +12,36 @@ bool validateCreateTableCommand(Command* command) {
     hasPassedValidation = false;
   }
 
-  if (!command->columnCount) {
+  if (!command->c_numColPairs) {
     printf("No column count. Aborting. \n");
     hasPassedValidation = false;
   }
 
-  if (!command->columnNames) {
-    printf("No column names. Aborting. \n");
-    hasPassedValidation = false;
-  }
-
-  if (!command->columnTypes) {
-    printf("No column types. Aborting. \n");
+  if (!command->c_colPairs) {
+    printf("No column definitions. Aborting. \n");
     hasPassedValidation = false;
   }
 
   return hasPassedValidation;
+}
+
+// convert string to column type
+ColumnType convertStrToColumnType(char* colDef) {
+  ColumnType type = COL_UNDEFINED;
+
+  if (strncmp(colDef, "INT", 3) == 0) {
+    type = COL_INT;
+  }
+
+  if (strncmp(colDef, "BOOL", 4) == 0) {
+    type = COL_BOOL;
+  }
+
+  if (strncmp(colDef, "VARCHAR(255)", 12) == 0) {
+    type = COL_STRING;
+  }
+
+  return type;
 }
 
 Table* createTable(Command* command) {
@@ -39,14 +53,15 @@ Table* createTable(Command* command) {
 
   Table* table = malloc(sizeof(Table));
 
-  table->schema.columnCount = command->columnCount;
-  table->schema.columns = malloc(sizeof(ColumnSchema) * command->columnCount);
-  
-  for (int i = 0; i < command->columnCount; i++) {
-    strcpy(table->schema.columns[i].name, command->columnNames[i]);
-    table->schema.columns[i].type = command->columnTypes[i];
+  table->schema.columnCount = command->c_numColPairs;
+  table->schema.columns = malloc(sizeof(ColumnSchema) * command->c_numColPairs);
 
-    printf("created type: %d\n", command->columnTypes[i]);
+  for (int i = 0; i < command->c_numColPairs; i++) {
+    strcpy(table->schema.columns[i].name, command->c_colPairs[i].colName);
+
+    ColumnType type = convertStrToColumnType(command->c_colPairs[i].colDef);
+
+    table->schema.columns[i].type = type;
   }
 
   table->rowCount = 0;

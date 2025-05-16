@@ -5,35 +5,6 @@
 #include "repl.h"
 #include "database.h"
 
-void freeCommand(Command* command) {
-  if (!command) return;
-
-  if (command->tableName) free(command->tableName);
-
-  if (command->columnNames) {
-    for (int i = 0; i < command->columnCount; i++) {
-      free(command->columnNames[i]);
-    }
-    free(command->columnNames);
-  }
-
-  if (command->columnTypes) free(command->columnTypes);
-
-  if (command->insertValues) {
-    for (int i = 0; i < command->valueCount; i++) {
-      free(command->insertValues[i]);
-    }
-  }
-
-  if (command->selectColumns) {
-    for (int i = 0; i < command->selectCount; i++) {
-      free(command->selectColumns[i]);
-    }
-    free(command->selectColumns);
-  }
-  free(command);
-}
-
 int main() {
   bool isContinue = true;
   
