@@ -1,9 +1,7 @@
-test/Testdatabase.c:69:test_createTable_success_3cols:PASS
-No table name. Aborting.
-No column count. Aborting. 
-No column definitions. Aborting. 
-test/Testdatabase.c:70:test_createTable_fail_no_tableName:PASS
+{ 1, true, 'this is my message', }
+{ 2, false, 'actually this is', }
+test/Testdatabase.c:102:test_insertRecord_success_3cols:PASS
 
 -----------------------
-2 Tests 0 Failures 0 Ignored 
+1 Tests 0 Failures 0 Ignored 
 OK

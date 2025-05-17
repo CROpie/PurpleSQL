@@ -237,6 +237,36 @@ void test_parseInput_InsertInto_fail_not_escaped_quotation(void) {
   freeCommand(command);
 }
 
+void test_parseInput_InsertInto_WhitespaceEverywhere(void) {
+  
+  char sql[] = 
+    "INSERT INTO myTable   (id  \n , \t isDeleted , message    )  "
+    "VALUES ( 1\n  ,   false , \t'this is my message' \n \n\t)  ;";
+
+  Command* command = parseInput(sql);
+
+  TEST_ASSERT_NOT_NULL(command);
+
+  TEST_ASSERT_EQUAL(CMD_INSERT, command->type);
+
+  TEST_ASSERT_EQUAL_STRING("myTable", command->tableName);
+
+  TEST_ASSERT_EQUAL(3, command->i_numColNames);
+
+  TEST_ASSERT_EQUAL_STRING("id", command->i_colNames[0]);
+  TEST_ASSERT_EQUAL_STRING("isDeleted", command->i_colNames[1]);
+  TEST_ASSERT_EQUAL_STRING("message", command->i_colNames[2]);
+
+  TEST_ASSERT_EQUAL(1, command->i_numValueRows);
+
+  TEST_ASSERT_EQUAL_STRING("1", command->i_colValueRows[0][0]);
+  TEST_ASSERT_EQUAL_STRING("false", command->i_colValueRows[0][1]);
+  TEST_ASSERT_EQUAL_STRING("this is my message", command->i_colValueRows[0][2]);
+
+  // Clean up after the test
+  freeCommand(command);
+}
+
 /* Testing CreateTable */
 void test_parseInput_CreateTable_3cols(void) {
   
@@ -269,6 +299,37 @@ void test_parseInput_CreateTable_3cols(void) {
   freeCommand(command);
 }
 
+void test_parseInput_CreateTable_3cols_extendedDef(void) {
+  
+  char sql[] = 
+    "CREATE TABLE myTable (\n"
+    "id INT NOT NULL AUTO_INCREMENT,\n"
+    "isDeleted BOOL,\n"
+    "message VARCHAR(255) NOT NULL);";
+
+  Command* command = parseInput(sql);
+
+  TEST_ASSERT_NOT_NULL(command);
+
+  TEST_ASSERT_EQUAL(CMD_CREATE, command->type);
+
+  TEST_ASSERT_EQUAL_STRING("myTable", command->tableName);
+
+  TEST_ASSERT_EQUAL(3, command->c_numColPairs);
+
+  TEST_ASSERT_EQUAL_STRING("id", command->c_colPairs[0].colName);
+  TEST_ASSERT_EQUAL_STRING("INT NOT NULL AUTO_INCREMENT", command->c_colPairs[0].colDef);
+
+  TEST_ASSERT_EQUAL_STRING("isDeleted", command->c_colPairs[1].colName);
+  TEST_ASSERT_EQUAL_STRING("BOOL", command->c_colPairs[1].colDef);
+
+  TEST_ASSERT_EQUAL_STRING("message", command->c_colPairs[2].colName);
+  TEST_ASSERT_EQUAL_STRING("VARCHAR(255) NOT NULL", command->c_colPairs[2].colDef);
+
+  // Clean up after the test
+  freeCommand(command);
+}
+
 void test_parseInput_CreateTable_WhitespaceEverywhere(void) {
   
   char sql[] = 
@@ -295,6 +356,37 @@ void test_parseInput_CreateTable_WhitespaceEverywhere(void) {
 
   TEST_ASSERT_EQUAL_STRING("message", command->c_colPairs[2].colName);
   TEST_ASSERT_EQUAL_STRING("VARCHAR(255)", command->c_colPairs[2].colDef);
+
+  // Clean up after the test
+  freeCommand(command);
+}
+
+void test_parseInput_CreateTable_3cols_extendedDef_WhitespaceEverywhere(void) {
+  
+  char sql[] = 
+    "CREATE TABLE myTable    (\n"
+    "id    INT  \n \t NOT  \t NULL AUTO_INCREMENT,\n"
+    "isDeleted    BOOL   ,  \n"
+    "message \t\n VARCHAR(255)  \n NOT   \t NULL );";
+
+  Command* command = parseInput(sql);
+
+  TEST_ASSERT_NOT_NULL(command);
+
+  TEST_ASSERT_EQUAL(CMD_CREATE, command->type);
+
+  TEST_ASSERT_EQUAL_STRING("myTable", command->tableName);
+
+  TEST_ASSERT_EQUAL(3, command->c_numColPairs);
+
+  TEST_ASSERT_EQUAL_STRING("id", command->c_colPairs[0].colName);
+  TEST_ASSERT_EQUAL_STRING("INT NOT NULL AUTO_INCREMENT", command->c_colPairs[0].colDef);
+
+  TEST_ASSERT_EQUAL_STRING("isDeleted", command->c_colPairs[1].colName);
+  TEST_ASSERT_EQUAL_STRING("BOOL", command->c_colPairs[1].colDef);
+
+  TEST_ASSERT_EQUAL_STRING("message", command->c_colPairs[2].colName);
+  TEST_ASSERT_EQUAL_STRING("VARCHAR(255) NOT NULL", command->c_colPairs[2].colDef);
 
   // Clean up after the test
   freeCommand(command);
@@ -362,9 +454,11 @@ void test_parseInput_CreateTable_fail_missing_parens(void) {
 
 int main(void) {
   UNITY_BEGIN();
-
+  
   RUN_TEST(test_parseInput_CreateTable_3cols);
+  RUN_TEST(test_parseInput_CreateTable_3cols_extendedDef);
   RUN_TEST(test_parseInput_CreateTable_WhitespaceEverywhere);
+  RUN_TEST(test_parseInput_CreateTable_3cols_extendedDef_WhitespaceEverywhere);
   RUN_TEST(test_parseInput_CreateTable_NoSpaces);
   RUN_TEST(test_parseInput_CreateTable_noTableName);
   RUN_TEST(test_parseInput_CreateTable_fail_missing_parens);
@@ -373,6 +467,7 @@ int main(void) {
   RUN_TEST(test_parseInput_InsertInto_3cols_2rows);
   RUN_TEST(test_parseInput_InsertInto_escaped_quotation);
   RUN_TEST(test_parseInput_InsertInto_fail_not_escaped_quotation);
+  RUN_TEST(test_parseInput_InsertInto_WhitespaceEverywhere);
 
   RUN_TEST(test_parseInput_Select_star);
   RUN_TEST(test_parseInput_Select_3_cols);

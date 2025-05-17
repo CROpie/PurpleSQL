@@ -50,7 +50,7 @@ typedef struct {
 
 typedef struct {
   TableSchema schema;
-  Row** rows;
+  Row* rows;
   int rowCount;
 } Table;
 
@@ -92,5 +92,7 @@ typedef struct {
 } Command;
 
 Table* createTable(Command* command);
+void insertRecord(Table* table, Command* command);
+void selectColumns(Table* table, Command* command);
 
 #endif

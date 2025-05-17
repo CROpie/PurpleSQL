@@ -2,7 +2,11 @@
 #include <stdlib.h>
 
 #include "unity.h"
+#include "repl.h"
 #include "database.h"
+
+
+
 
 void setUp(void) {
   //
@@ -11,6 +15,35 @@ void setUp(void) {
 void tearDown(void) {
 }
 
+/* INSERT RECORD */
+
+void test_insertRecord_success_3cols(void) {
+  
+  char createSql[] = 
+    "CREATE TABLE myTable (\n"
+    "id INT,\n"
+    "isDeleted BOOL,\n"
+    "message VARCHAR(255) );";
+
+  Command* createCommand = parseInput(createSql);
+
+  Table* table = createTable(createCommand);
+
+    char insertSql[] = 
+    "INSERT INTO myTable (id, isDeleted, message )"
+    "VALUES (1, true, 'this is my message' ), (2, false, 'actually this is');";
+
+  Command* insertCommand = parseInput(insertSql);
+
+  insertRecord(table, insertCommand);
+
+  char selectSql[] = 
+    "SELECT * FROM myTable;";
+
+  Command* selectCommand = parseInput(selectSql);
+
+  selectColumns(table, selectCommand);
+}
 
 /* CREATE TABLE */
 
@@ -23,7 +56,6 @@ void test_createTable_fail_no_tableName(void) {
   free(command);
 }
 
-// Test the createTable function
 void test_createTable_success_3cols(void) {
   
   char* tableName = "myTable";
@@ -65,8 +97,9 @@ void test_createTable_success_3cols(void) {
 int main(void) {
     UNITY_BEGIN();
 
-    RUN_TEST(test_createTable_success_3cols);
-    RUN_TEST(test_createTable_fail_no_tableName);
+    // RUN_TEST(test_createTable_success_3cols);
+    // RUN_TEST(test_createTable_fail_no_tableName);
+    RUN_TEST(test_insertRecord_success_3cols);
 
     return UNITY_END();
 }

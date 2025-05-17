@@ -69,3 +69,100 @@ Table* createTable(Command* command) {
 
   return table;
 }
+
+void insertRecord(Table* table, Command* command) {
+
+ if (command->i_numColNames > table->schema.columnCount) {
+  printf("Schema mismatch: to many columns entered.\n");
+  return;
+ }
+
+ int numCols = command->i_numColNames;
+
+  // malloc array of rows
+  table->rows = calloc(sizeof(Row), command->i_numValueRows);
+
+  // fill up rows 1 by 1
+  for (int colValueRowIndex = 0; colValueRowIndex < command->i_numValueRows; colValueRowIndex++) {
+
+    // malloc a row of values
+    table->rows[colValueRowIndex].values = malloc(sizeof(Value) * numCols);
+
+    // move this to after the loop - only if successful
+    table->rowCount++;
+
+    // iterate over i_colNames - need to determine the types
+    for (int colNameIndex = 0; colNameIndex < numCols; colNameIndex++) {
+
+      // attempt to find matching column
+      for (int schemaColNameIndex = 0; schemaColNameIndex < numCols; schemaColNameIndex++) {
+
+        // search for match
+        if (!strcmp(command->i_colNames[colNameIndex], table->schema.columns[schemaColNameIndex].name) == 0) continue;
+
+        char* str = command->i_colValueRows[colValueRowIndex][colNameIndex];
+
+        // coerce value from string into correct type
+        switch (table->schema.columns[schemaColNameIndex].type) {
+          case COL_INT:
+            char* endptr;
+            int val = (int) strtol(str, &endptr, 10);
+            if (*endptr != '\0') {
+              printf("Invalid input: could not convert %s to int\n", str);
+            }
+            table->rows[colValueRowIndex].values[colNameIndex].intValue = val;
+            break;
+          case COL_BOOL:
+            if (strcmp(str, "true") == 0) {
+              table->rows[colValueRowIndex].values[colNameIndex].boolValue = true;
+            } else if (strcmp(str, "false") == 0) {
+              table->rows[colValueRowIndex].values[colNameIndex].boolValue = false;
+            } else {
+              printf("Invalid input: could not convert %s to bool\n", str);
+            }
+            break;
+          case COL_STRING:
+              strcpy(table->rows[colValueRowIndex].values[colNameIndex].stringValue, str);
+              // add a check to see if string got truncated / will be truncated
+            break;
+          default:
+            printf("unrecognized type");
+        }
+    }
+  }
+ }
+}
+
+void printAll(Table* table) {
+
+  for (int rowIndex = 0; rowIndex < table->rowCount; rowIndex++) {
+
+    printf("{ ");
+
+    for (int colIndex = 0; colIndex < table->schema.columnCount; colIndex++) {
+
+      // printf("colIndex: %d type: %d\n", colIndex, table->schema.columns[colIndex].type);
+
+      switch (table->schema.columns[colIndex].type) {
+        case COL_INT:
+          printf("%d, ", table->rows[rowIndex].values[colIndex].intValue);
+          break;
+        case COL_BOOL:
+          printf(table->rows[rowIndex].values[colIndex].boolValue ? "true, " : "false, ");
+          break;
+        case COL_STRING:
+          printf("'%s', ", table->rows[rowIndex].values[colIndex].stringValue);
+          break;
+        default:
+          printf("Unrecognized column type...\n");
+      }  
+    }
+    printf("}\n");
+  }
+}
+
+void selectColumns(Table* table, Command* command) {
+  if (command->s_all) {
+    printAll(table);
+  }
+}

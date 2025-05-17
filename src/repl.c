@@ -76,6 +76,29 @@ char* replaceEscapedQuote(char* str) {
 	return result;
 }
 
+void trimWhitespace(char* str) {
+    char* end;
+
+    // Trim leading space
+    while (isspace((unsigned char)*str)) str++;
+
+    if (*str == 0) { // All spaces?
+        *str = '\0';
+        return;
+    }
+
+    // Trim trailing space
+    end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end)) end--;
+
+    // Write new null terminator
+    *(end + 1) = '\0';
+
+    // Optional: move trimmed string to the start of the buffer
+    memmove((void*)(str - (str - str)), str, strlen(str) + 1);
+}
+
+
 /* VALIDATION FUNCTIONS */
 // Check whether the number of ( matches ) and ' matches ' (not including inside quotes)
 bool checkBalancedParensAndQuotes(char* input) {
@@ -312,6 +335,7 @@ char** insertInto_extractColumns(char** pPtr, int* colCount) {
 		size_t len = p - tokenStart;
 		char* col = calloc(len + 1, 1);
 		strncpy(col, tokenStart, len);
+		trimWhitespace(col);
 
 		if (count >= capacity) {
 			capacity *= 2;
@@ -322,9 +346,11 @@ char** insertInto_extractColumns(char** pPtr, int* colCount) {
 		if (*col == '\'' && strstr(col, "''")) {
 			char* result = replaceEscapedQuote(col);
 			strcpy(col, result);
-			len = strlen(col);
 			free(result);
 		}
+
+		// update length as it may have shrunk
+		len = strlen(col);
 
 		// check for string, remove outer ' ... '
 		if (len >= 2 && col[0] == '\'' && col[len - 1] == '\'') {
