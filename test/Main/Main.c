@@ -18,21 +18,6 @@ void test_main_output(void) {
     FILE* oldStdout = stdout;
     stdout = tempOut;
 
-    // Redirect stdin with fmemopen or a file
-    // char input[] = 
-    //     "CREATE TABLE myTable ( id INT, isDeleted BOOL, message VARCHAR(255) );\n"
-    //     "INSERT INTO myTable ( id, isDeleted, message ) VALUES (1, false, 'first message');\n"
-    //     "SELECT * FROM myTable;\n"
-    //     "exit;\n"
-    // ;
-
-    // char* expectedOutput[] = {
-    //     "Table creation successful.",
-    //     "Record insertion successful.",
-    //     "{ 1, false, 'first message', }",
-    //     "goodbyte"
-    // };
-
     char input[] = 
         "CREATE TABLE myTable ( id INT, isDeleted BOOL, message VARCHAR(255) );\n"
         "INSERT INTO myTable ( id, isDeleted, message ) VALUES (1, false, 'first message');\n"
@@ -65,6 +50,7 @@ void test_main_output(void) {
 
     stdout = oldStdout;
     fclose(tempOut);
+    remove("temp_output.txt");
 
     int expectedLineCount = sizeof(expectedOutput) / sizeof(expectedOutput[0]);
 
