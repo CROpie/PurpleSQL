@@ -145,7 +145,7 @@ void test_parseInput_InsertInto_3cols_1row(void) {
   
   char sql[] = 
     "INSERT INTO myTable (id, isDeleted, message)"
-    "VALUES (1, false, 'this is my message');";
+    "VALUES (1, false, 'this is my message');  ";
 
   Command* command = parseInput(sql);
 
@@ -210,7 +210,7 @@ void test_parseInput_InsertInto_escaped_quotation(void) {
   
   char sql[] = 
     "INSERT INTO myTable (message)"
-    "VALUES ('this isn''t my message'),";
+    "VALUES ('this isn''t my message');";
 
   Command* command = parseInput(sql);
 
@@ -438,6 +438,20 @@ void test_parseInput_CreateTable_noTableName(void) {
   freeCommand(command);
 }
 
+void test_parseInput_CreateTable_no_trailing_semicolon(void) {
+  
+  char sql[] = 
+    "CREATE TABLE myTable ("
+    "message VARCHAR( 255 )";
+
+  Command* command = parseInput(sql);
+
+  TEST_ASSERT_EQUAL(CMD_ERROR, command->type);
+
+  // Clean up after the test
+  freeCommand(command);
+}
+
 void test_parseInput_CreateTable_fail_missing_parens(void) {
   
   char sql[] = 
@@ -454,6 +468,8 @@ void test_parseInput_CreateTable_fail_missing_parens(void) {
 
 int main(void) {
   UNITY_BEGIN();
+
+  RUN_TEST(test_parseInput_CreateTable_no_trailing_semicolon);
   
   RUN_TEST(test_parseInput_CreateTable_3cols);
   RUN_TEST(test_parseInput_CreateTable_3cols_extendedDef);

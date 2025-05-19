@@ -32,20 +32,20 @@ LINK = gcc
 DEPEND = gcc -MM -MG -MF
 CFLAGS = -I. -I$(PATHU) -I$(PATHI) -g -DTEST 
 
-# Test File Setup
-SRCT = $(wildcard $(PATHT)*.c)
-RESULTS = $(patsubst $(PATHT)Test%.c,$(PATHR)Test%.txt,$(SRCT))
+# Application object files used by tests (add all your core src .o files here)
+APP_OBJS = $(PATHO)database.o $(PATHO)repl.o $(PATHO)appmain.o
 
-PASSED = `grep -s PASS $(PATHR)*.txt`
-FAIL = `grep -s FAIL $(PATHR)*.txt`
-IGNORE = `grep -s IGNORE $(PATHR)*.txt`
+# Test source files (you can keep this for bulk test file discovery)
+SRCT = $(wildcard $(PATHT)**/*.c)
+
+# Result files for test outputs
+RESULTS = $(patsubst $(PATHT)%.c,$(PATHR)%.txt,$(SRCT))
 
 # Main app settings
 MAIN_SRC = src/main.c
-MAIN_OBJS = $(PATHO)main.o $(PATHO)database.o $(PATHO)repl.o
-#MAIN_OBJS = $(wildcard $(PATHO)*.o)
+MAIN_OBJS = $(PATHO)main.o $(APP_OBJS)
 MAIN_TARGET = main.$(TARGET_EXTENSION)
-MAIN_OUTPUT = build/$(MAIN_TARGET)
+MAIN_OUTPUT = $(PATHB)$(MAIN_TARGET)
 
 # Default target — builds everything (but doesn't run tests or app)
 all: $(BUILD_PATHS) $(RESULTS) $(MAIN_OUTPUT)
@@ -53,39 +53,45 @@ all: $(BUILD_PATHS) $(RESULTS) $(MAIN_OUTPUT)
 # Run unit tests
 test: all
 	@echo "-----------------------\nIGNORES:\n-----------------------"
-	@echo "$(IGNORE)"
+	@grep -rs IGNORE $(PATHR) | awk -F':' 'NF>=4 && $$(NF-1) != "" && $$NF != "" {print $$(NF-1) ":" $$NF}' || echo "None"
 	@echo "-----------------------\nFAILURES:\n-----------------------"
-	@echo "$(FAIL)"
+	@grep -rs FAIL $(PATHR) | awk -F':' 'NF>=4 && $$(NF-1) != "" && $$NF != "" {print $$(NF-1) ":" $$NF}' || echo "None"
 	@echo "-----------------------\nPASSED:\n-----------------------"
-	@echo "$(PASSED)"
+	@grep -rs PASS $(PATHR) | awk -F':' 'NF>=4 && $$(NF-1) != "" && $$NF != "" {print $$(NF-1) ":" $$NF}' || echo "None"
 	@echo "\nDONE"
 
 # Run main application
 run: $(MAIN_OUTPUT)
 	./$<
 
-# Create result files by executing test binaries
-$(PATHR)%.txt: $(PATHB)%.$(TARGET_EXTENSION)
+# Create result files by executing test binaries, ensuring parent dirs exist
+$(PATHR)%.txt: $(PATHB)%.${TARGET_EXTENSION}
+	@mkdir -p $(dir $@)
 	-./$< > $@ 2>&1
 
-# Link test binaries
-$(PATHB)Test%.$(TARGET_EXTENSION): $(PATHO)Test%.o $(PATHO)repl.o $(PATHO)%.o $(PATHO)unity.o
-
-# $(PATHB)Test%.$(TARGET_EXTENSION): $(PATHO)Test%.o $(PATHO)%.o $(PATHO)unity.o
+# Link test executables with unity and app objects
+$(PATHB)%.${TARGET_EXTENSION}: $(PATHO)%.o $(PATHO)unity.o $(APP_OBJS)
+	@mkdir -p $(dir $@)
 	$(LINK) -o $@ $^
 
 # Link main app
 $(MAIN_OUTPUT): $(MAIN_OBJS)
+	@mkdir -p $(dir $@)
 	$(LINK) -o $@ $^
 
-# Compile all sources to objects
-$(PATHO)%.o: $(PATHT)%.c
-	$(COMPILE) $(CFLAGS) $< -o $@
-
+# Compile all source files from src/
 $(PATHO)%.o: $(PATHS)%.c
+	@mkdir -p $(dir $@)
 	$(COMPILE) $(CFLAGS) $< -o $@
 
+# Compile all test source files from test/ (including subfolders)
+$(PATHO)%.o: $(PATHT)%.c
+	@mkdir -p $(dir $@)
+	$(COMPILE) $(CFLAGS) $< -o $@
+
+# Compile unity sources
 $(PATHO)%.o: $(PATHU)%.c $(PATHU)%.h
+	@mkdir -p $(dir $@)
 	$(COMPILE) $(CFLAGS) $< -o $@
 
 # Dependency file generation (optional)
@@ -93,11 +99,11 @@ $(PATHD)%.d: $(PATHT)%.c
 	$(DEPEND) $@ $<
 
 # Create build directories
-$(PATHB) $(PATHD) $(PATHO) $(PATHR):
+$(BUILD_PATHS):
 	$(MKDIR) $@
 
-# Debug
-debug: $(MAIN_OUTPUT) 
+# Debug with gdb
+debug: $(MAIN_OUTPUT)
 	gdb -tui $(MAIN_OUTPUT)
 
 # Valgrind
@@ -110,5 +116,5 @@ clean:
 	$(CLEANUP) $(PATHB)*.$(TARGET_EXTENSION)
 	$(CLEANUP) $(PATHR)*.txt
 
-.PHONY: clean test run all
-.PRECIOUS: $(PATHB)Test%.$(TARGET_EXTENSION) $(PATHD)%.d $(PATHO)%.o $(PATHR)%.txt
+.PHONY: clean test run all debug val
+.PRECIOUS: $(PATHB)%.${TARGET_EXTENSION} $(PATHD)%.d $(PATHO)%.o $(PATHR)%.txt

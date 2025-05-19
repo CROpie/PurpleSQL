@@ -1,7 +1,0 @@
-{ 1, true, 'this is my message', }
-{ 2, false, 'actually this is', }
-test/Testdatabase.c:102:test_insertRecord_success_3cols:PASS
-
------------------------
-1 Tests 0 Failures 0 Ignored 
-OK

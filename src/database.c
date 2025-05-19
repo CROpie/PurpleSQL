@@ -55,6 +55,9 @@ Table* createTable(Command* command) {
 
   table->schema.columnCount = command->c_numColPairs;
   table->schema.columns = malloc(sizeof(ColumnSchema) * command->c_numColPairs);
+  table->rowCapacity = ROW_CAPACITY;
+  table->rows = malloc(sizeof(Row*) * table->rowCapacity);
+  table->rowCount = 0;
 
   for (int i = 0; i < command->c_numColPairs; i++) {
     strcpy(table->schema.columns[i].name, command->c_colPairs[i].colName);
@@ -64,8 +67,8 @@ Table* createTable(Command* command) {
     table->schema.columns[i].type = type;
   }
 
-  table->rowCount = 0;
-  table->rows = NULL;
+  // table->rowCount = 0;
+  // table->rows = NULL;
 
   return table;
 }
@@ -77,19 +80,15 @@ void insertRecord(Table* table, Command* command) {
   return;
  }
 
- int numCols = command->i_numColNames;
-
-  // malloc array of rows
-  table->rows = calloc(sizeof(Row), command->i_numValueRows);
+  int numCols = command->i_numColNames;
 
   // fill up rows 1 by 1
   for (int colValueRowIndex = 0; colValueRowIndex < command->i_numValueRows; colValueRowIndex++) {
 
-    // malloc a row of values
-    table->rows[colValueRowIndex].values = malloc(sizeof(Value) * numCols);
+    Row* newRow = malloc(sizeof(Row));
 
-    // move this to after the loop - only if successful
-    table->rowCount++;
+    // malloc a row of values
+    newRow->values = malloc(sizeof(Value) * numCols);
 
     // iterate over i_colNames - need to determine the types
     for (int colNameIndex = 0; colNameIndex < numCols; colNameIndex++) {
@@ -110,19 +109,19 @@ void insertRecord(Table* table, Command* command) {
             if (*endptr != '\0') {
               printf("Invalid input: could not convert %s to int\n", str);
             }
-            table->rows[colValueRowIndex].values[colNameIndex].intValue = val;
+            newRow->values[colNameIndex].intValue = val;
             break;
           case COL_BOOL:
             if (strcmp(str, "true") == 0) {
-              table->rows[colValueRowIndex].values[colNameIndex].boolValue = true;
+              newRow->values[colNameIndex].boolValue = true;
             } else if (strcmp(str, "false") == 0) {
-              table->rows[colValueRowIndex].values[colNameIndex].boolValue = false;
+              newRow->values[colNameIndex].boolValue = false;
             } else {
               printf("Invalid input: could not convert %s to bool\n", str);
             }
             break;
           case COL_STRING:
-              strcpy(table->rows[colValueRowIndex].values[colNameIndex].stringValue, str);
+              strcpy(newRow->values[colNameIndex].stringValue, str);
               // add a check to see if string got truncated / will be truncated
             break;
           default:
@@ -130,6 +129,16 @@ void insertRecord(Table* table, Command* command) {
         }
     }
   }
+
+  // reallocate if needed
+  if (table->rowCount >= table->rowCapacity) {
+    int oldCapacity = table->rowCapacity;
+    table->rowCapacity *= 2;
+    table->rows = realloc(table->rows, table->rowCapacity * sizeof(Row));
+  }
+
+  table->rows[table->rowCount++] = newRow;
+
  }
 }
 
@@ -145,13 +154,13 @@ void printAll(Table* table) {
 
       switch (table->schema.columns[colIndex].type) {
         case COL_INT:
-          printf("%d, ", table->rows[rowIndex].values[colIndex].intValue);
+          printf("%d, ", table->rows[rowIndex]->values[colIndex].intValue);
           break;
         case COL_BOOL:
-          printf(table->rows[rowIndex].values[colIndex].boolValue ? "true, " : "false, ");
+          printf(table->rows[rowIndex]->values[colIndex].boolValue ? "true, " : "false, ");
           break;
         case COL_STRING:
-          printf("'%s', ", table->rows[rowIndex].values[colIndex].stringValue);
+          printf("'%s', ", table->rows[rowIndex]->values[colIndex].stringValue);
           break;
         default:
           printf("Unrecognized column type...\n");

@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#define ROW_CAPACITY 4
+
 typedef enum {
     CMD_CREATE,
     CMD_INSERT,
@@ -50,8 +52,9 @@ typedef struct {
 
 typedef struct {
   TableSchema schema;
-  Row* rows;
+  Row** rows;
   int rowCount;
+  int rowCapacity;
 } Table;
 
 typedef struct {

@@ -98,7 +98,6 @@ void trimWhitespace(char* str) {
     memmove((void*)(str - (str - str)), str, strlen(str) + 1);
 }
 
-
 /* VALIDATION FUNCTIONS */
 // Check whether the number of ( matches ) and ' matches ' (not including inside quotes)
 bool checkBalancedParensAndQuotes(char* input) {
@@ -534,19 +533,6 @@ char* extractTableName(char** pPtr) {
 }
 
 void parseCreate(char* input, Command* command) { 
-	/*
-		Pre-validation for:
-		- balanced parens
-		- balanced quotes
-		- columnName -> columnType matching
-		- ends in ; ( TODO? )
-	*/
-
-	if (!checkBalancedParensAndQuotes(input)) {
-		command->type = CMD_ERROR;
-		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
-		return;
-	}
 
 	if (!checkBalancedColNameToTypeInsideParens(input)) {
 		command->type = CMD_ERROR;
@@ -564,18 +550,6 @@ void parseCreate(char* input, Command* command) {
 }
 
 void parseInsert(char* input, Command* command) {
-	/*
-			Pre-validation for:
-			- balanced parens
-			- balanced quotes
-			- ends in ; ( TODO? )
-	*/
-
-	if (!checkBalancedParensAndQuotes(input)) {
-		command->type = CMD_ERROR;
-		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
-		return;
-	}
 
 	char* p = input + strlen("INSERT INTO");
 
@@ -616,18 +590,6 @@ void parseInsert(char* input, Command* command) {
 }
 
 void parseSelect(char* input, Command* command) {
-	/*
-			Pre-validation for:
-			- balanced parens
-			- balanced quotes
-			- ends in ; ??
-	*/
-
-	if (!checkBalancedParensAndQuotes(input)) {
-		command->type = CMD_ERROR;
-		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
-		return;
-	}
 
 	char* p = input + strlen("SELECT");
 
@@ -684,13 +646,29 @@ char* getInput() {
   }
 
   // validation to ensure use input was not too long
-
   return input;
 }
 
 Command* parseInput(char* input) {
   Command* command = calloc(sizeof(Command), 1);
   command->type = CMD_UNDEFINED;
+
+  // Remove whitespace
+  trimWhitespace(input);
+
+	// check that equal numbers of [()'] (unless inside quotes)
+	if (!checkBalancedParensAndQuotes(input)) {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
+		return command;
+	}
+
+	// Check that string ends in ;
+	if (input[strlen(input) - 1] != ';') {
+		command->type = CMD_ERROR;
+		command->e_message = writeError("Syntax error: input does not end in ;");
+		return command;
+	}
 
   if (strncmp(input, "CREATE TABLE ", 13) == 0) {
     command->type = CMD_CREATE;

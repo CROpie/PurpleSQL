@@ -1,0 +1,23 @@
+test/Repl/Testrepl.c:472:test_parseInput_CreateTable_no_trailing_semicolon:PASS
+test/Repl/Testrepl.c:474:test_parseInput_CreateTable_3cols:PASS
+test/Repl/Testrepl.c:475:test_parseInput_CreateTable_3cols_extendedDef:PASS
+test/Repl/Testrepl.c:476:test_parseInput_CreateTable_WhitespaceEverywhere:PASS
+test/Repl/Testrepl.c:477:test_parseInput_CreateTable_3cols_extendedDef_WhitespaceEverywhere:PASS
+test/Repl/Testrepl.c:478:test_parseInput_CreateTable_NoSpaces:PASS
+test/Repl/Testrepl.c:479:test_parseInput_CreateTable_noTableName:PASS
+test/Repl/Testrepl.c:480:test_parseInput_CreateTable_fail_missing_parens:PASS
+test/Repl/Testrepl.c:482:test_parseInput_InsertInto_3cols_1row:PASS
+test/Repl/Testrepl.c:483:test_parseInput_InsertInto_3cols_2rows:PASS
+test/Repl/Testrepl.c:484:test_parseInput_InsertInto_escaped_quotation:PASS
+test/Repl/Testrepl.c:485:test_parseInput_InsertInto_fail_not_escaped_quotation:PASS
+test/Repl/Testrepl.c:486:test_parseInput_InsertInto_WhitespaceEverywhere:PASS
+test/Repl/Testrepl.c:488:test_parseInput_Select_star:PASS
+test/Repl/Testrepl.c:489:test_parseInput_Select_3_cols:PASS
+test/Repl/Testrepl.c:490:test_parseInput_Select_3_cols_nospace:PASS
+test/Repl/Testrepl.c:492:test_parseInput_Select_star_Where_equals:PASS
+test/Repl/Testrepl.c:493:test_parseInput_Select_star_Where_truncated:PASS
+test/Repl/Testrepl.c:494:test_parseInput_Select_star_Where_only_col:PASS
+
+-----------------------
+19 Tests 0 Failures 0 Ignored 
+OK
