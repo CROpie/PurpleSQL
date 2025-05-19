@@ -1,8 +1,7 @@
-db > db > db > db > Line: Table creation successful.
+db > db > db > Line: Table creation successful.
 Line: Record insertion successful.
-Line: { 1, false, 'first message', }
 Line: goodbyte
-test/Main/Main.c:74:test_main_output:PASS
+test/Main/Main.c:86:test_main_output:PASS
 
 -----------------------
 1 Tests 0 Failures 0 Ignored 

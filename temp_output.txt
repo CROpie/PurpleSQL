@@ -1,4 +1,3 @@
 Table creation successful.
 Record insertion successful.
-{ 1, false, 'first message', }
 goodbyte

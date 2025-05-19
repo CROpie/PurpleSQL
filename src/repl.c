@@ -32,7 +32,6 @@ void freeCommand(Command* command) {
     free(command->i_colNames);
   }
 
-
   if (command->i_colValueRows) {
     for (int i = 0; i < command->i_numValueRows; i++) {
 
@@ -44,6 +43,26 @@ void freeCommand(Command* command) {
     }
     free(command->i_colValueRows);
   }
+
+  // select
+  if (command->s_colNames) {
+	for (int i = 0; i < command->s_colNameCount; i++) {
+		free(command->s_colNames[i]);
+	}
+	free(command->s_colNames);
+  }
+
+  // where
+  if (command->s_whereClause) {
+	if(command->s_whereClause->w_column) free(command->s_whereClause->w_column);
+	if(command->s_whereClause->w_operator) free(command->s_whereClause->w_operator);
+	if(command->s_whereClause->w_value) free(command->s_whereClause->w_value);
+
+	free(command->s_whereClause);
+  }
+
+  // error
+  if (command->e_message) free (command->e_message);
 
   // final
   free(command);
@@ -270,6 +289,7 @@ ColPair* createTable_extractColumns(char** pPtr, int* colCount) {
 		columns[count].colDef = strdup(definition);
 		count++;
 
+		free(definition);
 		free(colDef);
 
 		if (*p == ',') p++; // skip comma
@@ -344,8 +364,10 @@ char** insertInto_extractColumns(char** pPtr, int* colCount) {
 		// check for string, transform inner '' to '
 		if (*col == '\'' && strstr(col, "''")) {
 			char* result = replaceEscapedQuote(col);
-			strcpy(col, result);
-			free(result);
+			// strcpy(col, result);
+			// free(result);
+			free(col);
+			col = result;
 		}
 
 		// update length as it may have shrunk
@@ -383,7 +405,7 @@ Where_Clause* where_extractColumns(char** pPtr, int* colCount) {
 
 	int count = 0;
 
-	Where_Clause* columns = malloc(3 * sizeof(char*));
+	Where_Clause* columns = malloc(sizeof(Where_Clause));
 
 	/* COLUMN NAME */
 	while (isspace(*p)) p++;
@@ -393,6 +415,7 @@ Where_Clause* where_extractColumns(char** pPtr, int* colCount) {
 
 	if (*p == ';') {
 		// printf("no colName in where clause\n");
+		free(columns);
 		return NULL;
 	}
 
@@ -414,6 +437,8 @@ Where_Clause* where_extractColumns(char** pPtr, int* colCount) {
 
 	if (*p == ';') {
 		// printf("no operator in where clause\n");
+		free(columns->w_column);
+		free(columns);
 		return NULL;
 	}
 
@@ -432,6 +457,9 @@ Where_Clause* where_extractColumns(char** pPtr, int* colCount) {
 
 	if (*p == ';') {
 		// printf("no colValue in where clause\n");
+		free(columns->w_operator);
+		free(columns->w_column);
+		free(columns);
 		return NULL;
 	}
 
@@ -474,24 +502,25 @@ char** select_extractColumns(char** pPtr, int* colCount) {
 		while (!isspace(*p) && *p != ',' && *p != ';') p++;
 
 		size_t len = p - tokenStart;
-		char* col = calloc(len + 1, 1);
-		strncpy(col, tokenStart, len);
-
-		if (strncmp(col, "FROM", 4) == 0) {
-			break;
-		}
-
-		if (*p == ';') {
-			printf("Where clause has finished\n");
-			break;
-		}
 
 		if (count >= capacity) {
 			capacity *= 2;
 			columns = realloc(columns, capacity * sizeof(char*));
 		}
 
-		columns[count] = col;
+		columns[count] = calloc(len + 1, 1);
+		strncpy(columns[count], tokenStart, len);
+
+		if (strncmp(columns[count], "FROM", 4) == 0) {
+			free(columns[count]);
+			break;
+		}
+
+		if (*p == ';') {
+			printf("Where clause has finished\n");
+			free(columns[count]);
+			break;
+		}
 
 		count++;
 
@@ -547,6 +576,7 @@ void parseCreate(char* input, Command* command) {
 	int c_numColPairs;
 	command->c_colPairs = createTable_extractColumns(&p, &c_numColPairs);
 	command->c_numColPairs = c_numColPairs;
+
 }
 
 void parseInsert(char* input, Command* command) {
@@ -569,7 +599,7 @@ void parseInsert(char* input, Command* command) {
 
 	/* loop until ; to get all values*/
 	int colValueRowsCapacity = 4;
-	command->i_colValueRows = calloc(sizeof(char*), colValueRowsCapacity);
+	command->i_colValueRows = calloc(colValueRowsCapacity, sizeof(char*));
 
 	int i_numValueRows = 0;
 	while (*p && *p != ';') {
@@ -584,9 +614,10 @@ void parseInsert(char* input, Command* command) {
 		command->i_colValueRows[i_numValueRows] = colValueRow;
 
 		i_numValueRows++;
-		p++;
+		if (*p != '\0') p++;
 	}
 	command->i_numValueRows = i_numValueRows;
+
 }
 
 void parseSelect(char* input, Command* command) {
@@ -656,10 +687,11 @@ Command* parseInput(char* input) {
   // Remove whitespace
   trimWhitespace(input);
 
-	// check that equal numbers of [()'] (unless inside quotes)
+	// check that equal numbers of [()'] (unless inside quotes) 
 	if (!checkBalancedParensAndQuotes(input)) {
 		command->type = CMD_ERROR;
 		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
+		free(input);
 		return command;
 	}
 
@@ -667,6 +699,7 @@ Command* parseInput(char* input) {
 	if (input[strlen(input) - 1] != ';') {
 		command->type = CMD_ERROR;
 		command->e_message = writeError("Syntax error: input does not end in ;");
+		free(input);
 		return command;
 	}
 
@@ -689,7 +722,7 @@ Command* parseInput(char* input) {
     command->type = CMD_EXIT;
   }
 
-//   free(input);
+  free(input);
 
   return command;
 }

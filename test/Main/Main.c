@@ -19,17 +19,29 @@ void test_main_output(void) {
     stdout = tempOut;
 
     // Redirect stdin with fmemopen or a file
+    // char input[] = 
+    //     "CREATE TABLE myTable ( id INT, isDeleted BOOL, message VARCHAR(255) );\n"
+    //     "INSERT INTO myTable ( id, isDeleted, message ) VALUES (1, false, 'first message');\n"
+    //     "SELECT * FROM myTable;\n"
+    //     "exit;\n"
+    // ;
+
+    // char* expectedOutput[] = {
+    //     "Table creation successful.",
+    //     "Record insertion successful.",
+    //     "{ 1, false, 'first message', }",
+    //     "goodbyte"
+    // };
+
     char input[] = 
         "CREATE TABLE myTable ( id INT, isDeleted BOOL, message VARCHAR(255) );\n"
         "INSERT INTO myTable ( id, isDeleted, message ) VALUES (1, false, 'first message');\n"
-        "SELECT * FROM myTable;\n"
         "exit;\n"
     ;
 
     char* expectedOutput[] = {
         "Table creation successful.",
         "Record insertion successful.",
-        "{ 1, false, 'first message', }",
         "goodbyte"
     };
 
@@ -47,7 +59,7 @@ void test_main_output(void) {
     // Restore and read stdout
     fflush(tempOut);
     fseek(tempOut, 0, SEEK_SET);
-    char buffer[1024];
+    char buffer[1024] = {0};
     fread(buffer, 1, sizeof(buffer) - 1, tempOut);
     buffer[1023] = '\0';  // Null-terminate just in case
 

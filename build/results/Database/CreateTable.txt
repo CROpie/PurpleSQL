@@ -1,8 +1,8 @@
-test/Database/CreateTable.c:64:test_createTable_success_3cols:PASS
+test/Database/CreateTable.c:78:test_createTable_success_3cols:PASS
 No table name. Aborting.
 No column count. Aborting. 
 No column definitions. Aborting. 
-test/Database/CreateTable.c:65:test_createTable_fail_no_tableName:PASS
+test/Database/CreateTable.c:79:test_createTable_fail_no_tableName:PASS
 
 -----------------------
 2 Tests 0 Failures 0 Ignored 

@@ -1,0 +1,10 @@
+test/Repl/ParseSelect.c:155:test_parseInput_Select_star:PASS
+test/Repl/ParseSelect.c:156:test_parseInput_Select_3_cols:PASS
+test/Repl/ParseSelect.c:157:test_parseInput_Select_3_cols_nospace:PASS
+test/Repl/ParseSelect.c:159:test_parseInput_Select_star_Where_equals:PASS
+test/Repl/ParseSelect.c:160:test_parseInput_Select_star_Where_truncated:PASS
+test/Repl/ParseSelect.c:161:test_parseInput_Select_star_Where_only_col:PASS
+
+-----------------------
+6 Tests 0 Failures 0 Ignored 
+OK

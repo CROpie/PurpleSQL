@@ -5,6 +5,28 @@
 
 #include "database.h"
 
+void freeTable(Table* table) {
+
+  if (!table) return;
+
+  if (table->schema.columns) {
+    free(table->schema.columns);
+  }
+
+  for (int i = 0; i < table->rowCount; i++) {
+    if (table->rows[i]->values) {
+      free(table->rows[i]->values);
+      free(table->rows[i]);
+    }
+  }
+
+  if (table->rows) {
+    free(table->rows);
+  }
+
+  free(table);
+}
+
 bool validateCreateTableCommand(Command* command) {
   bool hasPassedValidation = true;
   if (!command->tableName) {

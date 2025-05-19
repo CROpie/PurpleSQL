@@ -45,9 +45,10 @@ int appMain() {
       printf("Unrecognized command\n");
     }
 
-    // if (input) free(input);
-    freeCommand(command);
+  freeCommand(command);
   }
+
+    freeTable(table);
 
   return 0;
 }

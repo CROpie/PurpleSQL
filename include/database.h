@@ -97,5 +97,6 @@ typedef struct {
 Table* createTable(Command* command);
 void insertRecord(Table* table, Command* command);
 void selectColumns(Table* table, Command* command);
+void freeTable(Table* table);
 
 #endif

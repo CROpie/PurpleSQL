@@ -29,6 +29,7 @@ void setUp(void) {
 }
 
 void tearDown(void) {
+  freeTable(table);
 }
 
 /* INSERT RECORD */
@@ -39,13 +40,16 @@ void test_insertRecord_success_3cols_1row(void) {
   "INSERT INTO myTable ( id, isDeleted, message )"
   "VALUES ( 1, true, 'this is my message' );";
 
-  Command* insertCommand = parseInput(insertSql);
+  char* insertInput = strdup(insertSql);
+  Command* insertCommand = parseInput(insertInput);
 
   insertRecord(table, insertCommand);
 
   TEST_ASSERT_EQUAL(table->rows[0]->values[0].intValue, 1);
   TEST_ASSERT_EQUAL(table->rows[0]->values[1].boolValue, true);
   TEST_ASSERT_EQUAL_STRING(table->rows[0]->values[2].stringValue, "this is my message");
+
+  freeCommand(insertCommand);
 }
 
 void test_insertRecord_success_3cols_1row_twice(void) {
@@ -54,7 +58,8 @@ void test_insertRecord_success_3cols_1row_twice(void) {
   "INSERT INTO myTable ( id, isDeleted, message )"
   "VALUES ( 1, true, 'this is my message' );";
 
-  Command* insertCommandOne = parseInput(insertSqlOne);
+  char* insertInputOne = strdup(insertSqlOne);
+  Command* insertCommandOne = parseInput(insertInputOne);
 
   insertRecord(table, insertCommandOne);
   
@@ -62,7 +67,8 @@ void test_insertRecord_success_3cols_1row_twice(void) {
   "INSERT INTO myTable ( id, isDeleted, message )"
   "VALUES ( 2, false, 'another message' );";
 
-  Command* insertCommandTwo = parseInput(insertSqlTwo);
+  char* insertInputTwo = strdup(insertSqlTwo);
+  Command* insertCommandTwo = parseInput(insertInputTwo);
 
   insertRecord(table, insertCommandTwo);
 
@@ -73,6 +79,9 @@ void test_insertRecord_success_3cols_1row_twice(void) {
   TEST_ASSERT_EQUAL(table->rows[1]->values[0].intValue, 2);
   TEST_ASSERT_EQUAL(table->rows[1]->values[1].boolValue, false);
   TEST_ASSERT_EQUAL_STRING(table->rows[1]->values[2].stringValue, "another message");
+
+  freeCommand(insertCommandOne);
+  freeCommand(insertCommandTwo);
 }
 
 void test_insertRecord_success_3cols_2rows(void) {
@@ -83,7 +92,8 @@ void test_insertRecord_success_3cols_2rows(void) {
   "( 1, true, 'this is my message' ),"
   "( 2, false, 'my second message' );";
 
-  Command* insertCommand = parseInput(insertSql);
+  char* insertInput = strdup(insertSql);
+  Command* insertCommand = parseInput(insertInput);
 
   insertRecord(table, insertCommand);
 
@@ -94,6 +104,8 @@ void test_insertRecord_success_3cols_2rows(void) {
   TEST_ASSERT_EQUAL(table->rows[1]->values[0].intValue, 2);
   TEST_ASSERT_EQUAL(table->rows[1]->values[1].boolValue, false);
   TEST_ASSERT_EQUAL_STRING(table->rows[1]->values[2].stringValue, "my second message");
+
+  freeCommand(insertCommand);
 }
 
 int main(void) {

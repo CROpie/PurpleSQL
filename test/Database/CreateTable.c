@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "unity.h"
 #include "repl.h"
@@ -18,23 +19,37 @@ void test_createTable_fail_no_tableName(void) {
 
   TEST_ASSERT_NULL(table);
 
-  free(command);
+  freeCommand(command);
+  freeTable(table);
 }
 
 void test_createTable_success_3cols(void) {
   
   char* tableName = "myTable";
-  
-  ColPair columnPairs[] = {
-    { "id", "INT" },
-    { "isDeleted", "BOOL" },
-    { "message", "VARCHAR(255)" }
-  };
+
+  // Doesn't work with freeCommand(command) because these pairs are in the stack  
+  // ColPair columnPairs[] = {
+  //   { "id", "INT" },
+  //   { "isDeleted", "BOOL" },
+  //   { "message", "VARCHAR(255)" }
+  // };
 
   Command* command = calloc(1, sizeof(Command));
-  command->tableName = tableName;
+  command->tableName = malloc(strlen(tableName) + 1);
+  strcpy(command->tableName, tableName);
+  
   command->c_numColPairs = 3;
-  command->c_colPairs = columnPairs;
+
+  command->c_colPairs = malloc(sizeof(ColPair) * command->c_numColPairs);
+
+  command->c_colPairs[0].colName = strdup("id");
+  command->c_colPairs[0].colDef  = strdup("INT");
+
+  command->c_colPairs[1].colName = strdup("isDeleted");
+  command->c_colPairs[1].colDef  = strdup("BOOL");
+
+  command->c_colPairs[2].colName = strdup("message");
+  command->c_colPairs[2].colDef  = strdup("VARCHAR(255)");
 
   Table* table = createTable(command);
 
@@ -53,9 +68,8 @@ void test_createTable_success_3cols(void) {
   TEST_ASSERT_EQUAL(0, table->rowCount);
 
   // Clean up after the test
-  free(command);
-  free(table->schema.columns);
-  free(table);
+  freeCommand(command);
+  freeTable(table);
 }
 
 int main(void) {
