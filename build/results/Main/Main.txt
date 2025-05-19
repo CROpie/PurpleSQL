@@ -1,8 +1,0 @@
-db > db > db > Line: Table creation successful.
-Line: Record insertion successful.
-Line: goodbyte
-test/Main/Main.c:86:test_main_output:PASS
-
------------------------
-1 Tests 0 Failures 0 Ignored 
-OK

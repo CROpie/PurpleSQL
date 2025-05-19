@@ -1,9 +1,0 @@
-test/Repl/ParseInsert.c:151:test_parseInput_InsertInto_3cols_1row:PASS
-test/Repl/ParseInsert.c:152:test_parseInput_InsertInto_3cols_2rows:PASS
-test/Repl/ParseInsert.c:153:test_parseInput_InsertInto_escaped_quotation:PASS
-test/Repl/ParseInsert.c:154:test_parseInput_InsertInto_fail_not_escaped_quotation:PASS
-test/Repl/ParseInsert.c:155:test_parseInput_InsertInto_WhitespaceEverywhere:PASS
-
------------------------
-5 Tests 0 Failures 0 Ignored 
-OK

@@ -1,3 +1,0 @@
-Table creation successful.
-Record insertion successful.
-goodbyte

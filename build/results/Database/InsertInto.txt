@@ -1,7 +1,0 @@
-test/Database/InsertInto.c:114:test_insertRecord_success_3cols_1row:PASS
-test/Database/InsertInto.c:115:test_insertRecord_success_3cols_1row_twice:PASS
-test/Database/InsertInto.c:116:test_insertRecord_success_3cols_2rows:PASS
-
------------------------
-3 Tests 0 Failures 0 Ignored 
-OK
