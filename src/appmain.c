@@ -34,7 +34,8 @@ int appMain() {
         printf("Record insertion successful.\n");
         break;
       case CMD_SELECT:
-        selectColumns(table, command);
+        Selection* selection = selectColumns(table, command);
+        freeSelection(selection);
         break;
       case CMD_EXIT:
         printf("goodbyte\n");

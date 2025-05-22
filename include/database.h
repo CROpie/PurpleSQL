@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #define ROW_CAPACITY 4
+#define SELECT_CAPACITY 4
 
 typedef enum {
     CMD_CREATE,
@@ -46,11 +47,31 @@ typedef union {
   char stringValue[255];
 } Value;
 
+/* Row -> Record instead? This will do for now*/
 typedef struct {
+  Value** values;
+  int valueCount;
+} SelectedRow;
+
+typedef struct {
+  SelectedRow* selectedRows;
+  int columnTypeCount;
+  int selectedRowCount;
+  int selectCapacity;
+} Selection;
+
+typedef struct {
+  int columnIndex;
+  ColumnType columnType;
+} SelectColumnInfo;
+
+typedef struct {
+  bool isDeleted;
   Value* values;
 } Row;
 
 typedef struct {
+  char* name;
   TableSchema schema;
   Row** rows;
   int rowCount;
@@ -96,7 +117,8 @@ typedef struct {
 
 Table* createTable(Command* command);
 void insertRecord(Table* table, Command* command);
-void selectColumns(Table* table, Command* command);
+Selection* selectColumns(Table* table, Command* command);
 void freeTable(Table* table);
+void freeSelection(Selection* selection);
 
 #endif

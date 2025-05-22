@@ -92,6 +92,31 @@ void test_parseInput_Select_3_cols_nospace(void) {
   freeCommand(command);
 }
 
+void test_parseInput_Select_1_col(void) {
+  
+  char sql[] = 
+    "SELECT id FROM myTable;";
+
+  char* input = strdup(sql);
+  Command* command = parseInput(input);
+
+  TEST_ASSERT_NOT_NULL(command);
+
+  TEST_ASSERT_EQUAL(CMD_SELECT, command->type);
+
+  TEST_ASSERT_EQUAL_STRING("myTable", command->tableName);
+
+  TEST_ASSERT_FALSE(command->s_all);
+
+  TEST_ASSERT_EQUAL_INT(1, command->s_colNameCount);
+  TEST_ASSERT_EQUAL_STRING("id", command->s_colNames[0]);
+
+  TEST_ASSERT_NULL(command->s_whereClause);
+  
+  // Clean up after the test
+  freeCommand(command);
+}
+
 void test_parseInput_Select_star_Where_equals(void) {
   
   char sql[] = 
@@ -151,10 +176,10 @@ void test_parseInput_Select_star_Where_only_col(void) {
 int main(void) {
   UNITY_BEGIN();
 
-
   RUN_TEST(test_parseInput_Select_star);
   RUN_TEST(test_parseInput_Select_3_cols);
   RUN_TEST(test_parseInput_Select_3_cols_nospace);
+  RUN_TEST(test_parseInput_Select_1_col);
 
   RUN_TEST(test_parseInput_Select_star_Where_equals);
   RUN_TEST(test_parseInput_Select_star_Where_truncated);

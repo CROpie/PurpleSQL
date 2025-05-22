@@ -9,6 +9,8 @@ void freeTable(Table* table) {
 
   if (!table) return;
 
+  if (table->name) free(table->name);
+
   if (table->schema.columns) {
     free(table->schema.columns);
   }
@@ -25,6 +27,15 @@ void freeTable(Table* table) {
   }
 
   free(table);
+}
+
+void freeSelection(Selection* selection) {
+  for (int i = 0; i < selection->selectedRowCount; i++) {
+    if (selection->selectedRows[i].values) free(selection->selectedRows[i].values);
+  }
+
+  if (selection->selectedRows) free(selection->selectedRows);
+  if (selection) free(selection);
 }
 
 bool validateCreateTableCommand(Command* command) {
@@ -75,6 +86,8 @@ Table* createTable(Command* command) {
 
   Table* table = malloc(sizeof(Table));
 
+  table->name = malloc(sizeof(command->tableName) + 1);
+  strcpy(table->name, command->tableName);
   table->schema.columnCount = command->c_numColPairs;
   table->schema.columns = malloc(sizeof(ColumnSchema) * command->c_numColPairs);
   table->rowCapacity = ROW_CAPACITY;
@@ -108,6 +121,8 @@ void insertRecord(Table* table, Command* command) {
   for (int colValueRowIndex = 0; colValueRowIndex < command->i_numValueRows; colValueRowIndex++) {
 
     Row* newRow = malloc(sizeof(Row));
+
+    newRow->isDeleted = false;
 
     // malloc a row of values
     newRow->values = malloc(sizeof(Value) * numCols);
@@ -144,7 +159,7 @@ void insertRecord(Table* table, Command* command) {
             break;
           case COL_STRING:
               strcpy(newRow->values[colNameIndex].stringValue, str);
-              // add a check to see if string got truncated / will be truncated
+              // add a check to see if string got truncated / will be truncated, since it is not char* but char[len]
             break;
           default:
             printf("unrecognized type");
@@ -164,25 +179,24 @@ void insertRecord(Table* table, Command* command) {
  }
 }
 
-void printAll(Table* table) {
+void printSelection(Table* table, Selection* selection, int columnCount, SelectColumnInfo* whereColumnInfo) {
 
-  for (int rowIndex = 0; rowIndex < table->rowCount; rowIndex++) {
+  for (int rowIndex = 0; rowIndex < selection->selectedRowCount; rowIndex++) {
 
     printf("{ ");
 
-    for (int colIndex = 0; colIndex < table->schema.columnCount; colIndex++) {
+    for (int colIndex = 0; colIndex < columnCount; colIndex++) {
 
-      // printf("colIndex: %d type: %d\n", colIndex, table->schema.columns[colIndex].type);
+      switch (whereColumnInfo[colIndex].columnType) {
 
-      switch (table->schema.columns[colIndex].type) {
         case COL_INT:
-          printf("%d, ", table->rows[rowIndex]->values[colIndex].intValue);
+          printf("%d, ", selection->selectedRows[rowIndex].values[colIndex]->intValue);
           break;
         case COL_BOOL:
-          printf(table->rows[rowIndex]->values[colIndex].boolValue ? "true, " : "false, ");
+          printf(selection->selectedRows[rowIndex].values[colIndex]->boolValue ? "true, " : "false, ");
           break;
         case COL_STRING:
-          printf("'%s', ", table->rows[rowIndex]->values[colIndex].stringValue);
+          printf("'%s', ", selection->selectedRows[rowIndex].values[colIndex]->stringValue);
           break;
         default:
           printf("Unrecognized column type...\n");
@@ -192,8 +206,101 @@ void printAll(Table* table) {
   }
 }
 
-void selectColumns(Table* table, Command* command) {
+Selection* selectColumns(Table* table, Command* command) {
+
+  // if * take columns from table schema and add them to command
   if (command->s_all) {
-    printAll(table);
+    free(command->s_colNames);
+    command->s_colNameCount = table->schema.columnCount;
+    command->s_colNames = malloc(sizeof(char*) * table->schema.columnCount);
+    for (int schemaColIndex = 0; schemaColIndex < table->schema.columnCount; schemaColIndex++) {
+      command->s_colNames[schemaColIndex] = malloc(strlen(table->schema.columns[schemaColIndex].name) + 1);
+      strncpy(command->s_colNames[schemaColIndex], table->schema.columns[schemaColIndex].name, strlen(table->schema.columns[schemaColIndex].name));
+    }
   }
+
+  SelectColumnInfo* selectColumnInfo = malloc(sizeof(SelectColumnInfo) * command->s_colNameCount);
+  int selectColumnInfoCount = 0;
+  
+  // create an array of indexes + types for the selected columns
+  for (int schemaColIndex = 0; schemaColIndex < table->schema.columnCount; schemaColIndex++) {
+    for (int selectColIndex = 0; selectColIndex < command->s_colNameCount; selectColIndex++) {
+      if (strcmp(table->schema.columns[schemaColIndex].name, command->s_colNames[selectColIndex]) == 0) {
+        selectColumnInfo[selectColumnInfoCount].columnIndex = schemaColIndex;
+        selectColumnInfo[selectColumnInfoCount].columnType = table->schema.columns[schemaColIndex].type;
+        selectColumnInfoCount++;
+        break;
+      }
+    }
+  }
+
+  // determine index and type of column used in where clause
+  SelectColumnInfo* whereColumnInfo = NULL;
+  Operand whereClauseOperand;
+
+  if (command->s_whereClause) {
+    whereColumnInfo = malloc(sizeof(SelectColumnInfo));
+
+    for (int commandColIndex = 0; commandColIndex < command->s_colNameCount; commandColIndex++) {
+      if (strcmp(command->s_colNames[commandColIndex], command->s_whereClause->w_column) == 0) {
+        whereColumnInfo->columnIndex = commandColIndex;
+        whereColumnInfo->columnType = table->schema.columns[commandColIndex].type;
+        break;
+      }
+    }
+
+    if (strcmp(command->s_whereClause->w_operator, "=") == 0) {
+      whereClauseOperand = OP_EQ;
+    }
+  }
+
+  // selection object: contains the rows which pass the filter
+  Selection* selection = calloc(sizeof(Selection), 1);
+  selection->selectedRowCount = 0;
+  selection->selectCapacity = SELECT_CAPACITY;
+  selection->selectedRows = calloc(sizeof(SelectedRow) * selection->selectCapacity, 1);
+
+  for (int rowIndex = 0; rowIndex < table->rowCount; rowIndex++) {
+    int skip = 0;
+
+    if (table->rows[rowIndex]->isDeleted) continue;
+
+    if (command->s_whereClause) {
+
+      if (whereClauseOperand == OP_EQ) {
+        char* endptr;
+        int val = (int) strtol(command->s_whereClause->w_value, &endptr, 10);
+        if (*endptr != '\0') {
+          printf("Invalid input: could not convert %s to int\n", command->s_whereClause->w_value);
+          continue;
+        }
+
+        if (table->rows[rowIndex]->values[whereColumnInfo->columnIndex].intValue != val) skip = 1;
+      }
+    }
+
+    if (skip) continue;
+
+    if (selection->selectedRowCount >= selection->selectCapacity) {
+      int oldCapacity = selection->selectCapacity;
+      selection->selectCapacity *= 2;
+      selection->selectedRows = realloc(selection->selectedRows, selection->selectCapacity * sizeof(SelectedRow));
+    }
+
+    selection->selectedRows[selection->selectedRowCount].values = malloc(sizeof(Value*) * command->s_colNameCount);
+
+    // iterate usedSchemaIndex array
+    // each int in the array is the position in table->rows[N]->values[] array
+    for (int usedSchemaIndex = 0; usedSchemaIndex < command->s_colNameCount; usedSchemaIndex++) {
+      selection->selectedRows[selection->selectedRowCount].values[usedSchemaIndex] = &table->rows[rowIndex]->values[selectColumnInfo[usedSchemaIndex].columnIndex];
+    }
+    selection->selectedRowCount++;
+  }
+
+  printSelection(table, selection, command->s_colNameCount, selectColumnInfo);
+
+  free(selectColumnInfo);
+  if (whereColumnInfo) free(whereColumnInfo);
+
+  return selection;
 }

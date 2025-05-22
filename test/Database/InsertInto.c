@@ -6,15 +6,22 @@
 #include "repl.h"
 #include "database.h"
 
+// SETUP : Manually create table
+// TESTS : Write command, run InsertInto
+
 Table* table;
 
 void setUp(void) {
 
   table = calloc(sizeof(Table), 1);
+
+  table->name = malloc(strlen("myTable") + 1);
+  strcpy(table->name, "myTable");
+
   table->schema.columnCount = 3;
   table->rowCapacity = ROW_CAPACITY;
 
-  table->rows = malloc(sizeof(Row) * table->rowCapacity);
+  table->rows = malloc(sizeof(Row*) * table->rowCapacity);
 
   table->schema.columns = malloc(sizeof(ColumnSchema) * table->schema.columnCount);
 

@@ -6,6 +6,9 @@
 #include "repl.h"
 #include "database.h"
 
+// SETUP : 
+// TESTS : Write Command, run CreateTable
+
 void setUp(void) {
   //
 }
@@ -54,6 +57,8 @@ void test_createTable_success_3cols(void) {
   Table* table = createTable(command);
 
   TEST_ASSERT_NOT_NULL(table);
+  TEST_ASSERT_EQUAL_STRING("myTable", table->name);
+
   TEST_ASSERT_EQUAL(3, table->schema.columnCount);
 
   TEST_ASSERT_EQUAL_STRING("id", table->schema.columns[0].name);
