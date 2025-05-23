@@ -29,6 +29,12 @@ void freeTable(Table* table) {
   free(table);
 }
 
+void freeTables(Tables* tables) {
+  for (int i = 0; i < tables->tableCount; i++) {
+    freeTable(tables->tableList[i]);
+  }
+}
+
 void freeSelection(Selection* selection) {
   for (int i = 0; i < selection->selectedRowCount; i++) {
     if (selection->selectedRows[i].values) free(selection->selectedRows[i].values);
@@ -108,7 +114,17 @@ Table* createTable(Command* command) {
   return table;
 }
 
-void insertRecord(Table* table, Command* command) {
+void insertRecord(Tables* tables, Command* command) {
+
+  Table* table;
+
+  // find table based on tableName
+  for (int i = 0; i < tables->tableCount; i++) {
+    if (strcmp(tables->tableList[i]->name, command->tableName) == 0) {
+      table = tables->tableList[i];
+      break;
+    }
+  }
 
  if (command->i_numColNames > table->schema.columnCount) {
   printf("Schema mismatch: to many columns entered.\n");
@@ -179,7 +195,7 @@ void insertRecord(Table* table, Command* command) {
  }
 }
 
-void printSelection(Table* table, Selection* selection, int columnCount, SelectColumnInfo* whereColumnInfo) {
+void printSelection(Table* table, Selection* selection, int columnCount, SelectColumnInfo* selectColumnInfo) {
 
   for (int rowIndex = 0; rowIndex < selection->selectedRowCount; rowIndex++) {
 
@@ -187,7 +203,7 @@ void printSelection(Table* table, Selection* selection, int columnCount, SelectC
 
     for (int colIndex = 0; colIndex < columnCount; colIndex++) {
 
-      switch (whereColumnInfo[colIndex].columnType) {
+      switch (selectColumnInfo[colIndex].columnType) {
 
         case COL_INT:
           printf("%d, ", selection->selectedRows[rowIndex].values[colIndex]->intValue);
@@ -206,15 +222,27 @@ void printSelection(Table* table, Selection* selection, int columnCount, SelectC
   }
 }
 
-Selection* selectColumns(Table* table, Command* command) {
+Selection* selectColumns(Tables* tables, Command* command) {
+
+  Table* table;
+
+  // find table based on tableName
+  for (int i = 0; i < tables->tableCount; i++) {
+    if (strcmp(tables->tableList[i]->name, command->tableName) == 0) {
+      table = tables->tableList[i];
+      break;
+    }
+  }
+
+  // printf("s_all: %d\n", command->s_all);
 
   // if * take columns from table schema and add them to command
   if (command->s_all) {
     free(command->s_colNames);
     command->s_colNameCount = table->schema.columnCount;
-    command->s_colNames = malloc(sizeof(char*) * table->schema.columnCount);
+    command->s_colNames = calloc(sizeof(char*) * table->schema.columnCount, 1);
     for (int schemaColIndex = 0; schemaColIndex < table->schema.columnCount; schemaColIndex++) {
-      command->s_colNames[schemaColIndex] = malloc(strlen(table->schema.columns[schemaColIndex].name) + 1);
+      command->s_colNames[schemaColIndex] = calloc(strlen(table->schema.columns[schemaColIndex].name), 1);
       strncpy(command->s_colNames[schemaColIndex], table->schema.columns[schemaColIndex].name, strlen(table->schema.columns[schemaColIndex].name));
     }
   }
@@ -299,7 +327,9 @@ Selection* selectColumns(Table* table, Command* command) {
 
   printSelection(table, selection, command->s_colNameCount, selectColumnInfo);
 
-  free(selectColumnInfo);
+  // printf("{ 1, false, 'first message', }\n");
+
+  // free(selectColumnInfo);
   if (whereColumnInfo) free(whereColumnInfo);
 
   return selection;

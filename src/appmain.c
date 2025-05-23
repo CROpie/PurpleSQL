@@ -11,7 +11,11 @@ void printHome() {
 
 int appMain() {
   bool isContinue = true;
-  Table* table;
+
+  Tables* tables = malloc(sizeof(Tables));
+  tables->tablesCapacity = TABLE_CAPACITY;
+  tables->tableList = malloc(sizeof(Table*) * tables->tablesCapacity);
+  tables->tableCount = 0;
   
   while (isContinue) {
     printHome();
@@ -26,15 +30,15 @@ int appMain() {
     Command* command = parseInput(input);
     switch (command->type) {
       case CMD_CREATE:
-        table = createTable(command);
+        tables->tableList[tables->tableCount++] = createTable(command);
         printf("Table creation successful.\n");
         break;
       case CMD_INSERT:
-        insertRecord(table, command);
+        insertRecord(tables, command);
         printf("Record insertion successful.\n");
         break;
       case CMD_SELECT:
-        Selection* selection = selectColumns(table, command);
+        Selection* selection = selectColumns(tables, command);
         freeSelection(selection);
         break;
       case CMD_EXIT:
@@ -43,13 +47,13 @@ int appMain() {
         break;
       case CMD_UNDEFINED:
       default:
-      printf("Unrecognized command\n");
+        printf("Unrecognized command\n");
     }
 
   freeCommand(command);
   }
 
-    freeTable(table);
+  // freeTable(table);
 
   return 0;
 }

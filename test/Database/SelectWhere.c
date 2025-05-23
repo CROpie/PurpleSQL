@@ -9,12 +9,15 @@
 // SETUP : Manually create table, insert 2 rows
 // TESTS : Write command, run SelectWhere
 
-Table* table;
+Tables* tables;
 
 void setUp(void) {
 
-  // MANUAL CREATE TABLE
-  table = calloc(sizeof(Table), 1);
+  tables = malloc(sizeof(Tables));
+  tables->tableList = malloc(sizeof(Table*) * tables->tablesCapacity);
+  tables->tableCount = 0;
+
+  Table* table = calloc(sizeof(Table), 1);
 
   table->name = malloc(strlen("myTable") + 1);
   strcpy(table->name, "myTable");
@@ -53,10 +56,11 @@ void setUp(void) {
   strcpy(table->rows[1]->values[2].stringValue, "second message");
 
   table->rowCount = 2;
+  tables->tableList[tables->tableCount++] = table;
 }
 
 void tearDown(void) {
-  freeTable(table);
+  freeTables(tables);
 }
 
 void test_selectWhere_success_star(void) {
@@ -67,9 +71,7 @@ void test_selectWhere_success_star(void) {
   char* selectInput = strdup(selectSql);
   Command* selectCommand = parseInput(selectInput);
 
-  Selection* selection = selectColumns(table, selectCommand);
-
-  // printf("test selectedRowCount: %d\n", selection->selectedRowCount);
+  Selection* selection = selectColumns(tables, selectCommand);
 
   TEST_ASSERT_EQUAL(selection->selectedRowCount, 2);
 
@@ -93,7 +95,7 @@ void test_selectWhere_success_id_only(void) {
   char* selectInput = strdup(selectSql);
   Command* selectCommand = parseInput(selectInput);
 
-  Selection* selection = selectColumns(table, selectCommand);
+  Selection* selection = selectColumns(tables, selectCommand);
 
   TEST_ASSERT_EQUAL(selection->selectedRowCount, 2);
 
@@ -111,7 +113,7 @@ void test_selectWhere_success_id_and_message(void) {
   char* selectInput = strdup(selectSql);
   Command* selectCommand = parseInput(selectInput);
 
-  Selection* selection = selectColumns(table, selectCommand);
+  Selection* selection = selectColumns(tables, selectCommand);
 
   TEST_ASSERT_EQUAL(selection->selectedRowCount, 2);
 
@@ -133,7 +135,7 @@ void test_selectWhere_success_id_only_where_one_id(void) {
   char* selectInput = strdup(selectSql);
   Command* selectCommand = parseInput(selectInput);
 
-  Selection* selection = selectColumns(table, selectCommand);
+  Selection* selection = selectColumns(tables, selectCommand);
 
   TEST_ASSERT_EQUAL(selection->selectedRowCount, 1);
 

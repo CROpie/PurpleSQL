@@ -5,6 +5,7 @@
 
 #define ROW_CAPACITY 4
 #define SELECT_CAPACITY 4
+#define TABLE_CAPACITY 4
 
 typedef enum {
     CMD_CREATE,
@@ -79,6 +80,12 @@ typedef struct {
 } Table;
 
 typedef struct {
+  Table** tableList;
+  int tableCount;
+  int tablesCapacity;
+} Tables;
+
+typedef struct {
   char* colName;
   char* colDef;
 } ColPair;
@@ -116,9 +123,10 @@ typedef struct {
 } Command;
 
 Table* createTable(Command* command);
-void insertRecord(Table* table, Command* command);
-Selection* selectColumns(Table* table, Command* command);
+void insertRecord(Tables* tables, Command* command);
+Selection* selectColumns(Tables* tables, Command* command);
 void freeTable(Table* table);
+void freeTables(Tables* tables);
 void freeSelection(Selection* selection);
 
 #endif

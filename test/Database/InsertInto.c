@@ -9,11 +9,15 @@
 // SETUP : Manually create table
 // TESTS : Write command, run InsertInto
 
-Table* table;
+Tables* tables;
 
 void setUp(void) {
 
-  table = calloc(sizeof(Table), 1);
+  tables = malloc(sizeof(Tables));
+  tables->tableList = malloc(sizeof(Table*) * tables->tablesCapacity);
+  tables->tableCount = 0;
+
+  Table* table = calloc(sizeof(Table), 1);
 
   table->name = malloc(strlen("myTable") + 1);
   strcpy(table->name, "myTable");
@@ -33,13 +37,14 @@ void setUp(void) {
 
   strcpy(table->schema.columns[2].name, "message");
   table->schema.columns[2].type = COL_STRING;
+
+  tables->tableList[tables->tableCount++] = table;
 }
 
 void tearDown(void) {
-  freeTable(table);
+  freeTables(tables);
 }
 
-/* INSERT RECORD */
 
 void test_insertRecord_success_3cols_1row(void) {
   
@@ -50,11 +55,11 @@ void test_insertRecord_success_3cols_1row(void) {
   char* insertInput = strdup(insertSql);
   Command* insertCommand = parseInput(insertInput);
 
-  insertRecord(table, insertCommand);
+  insertRecord(tables, insertCommand);
 
-  TEST_ASSERT_EQUAL(table->rows[0]->values[0].intValue, 1);
-  TEST_ASSERT_EQUAL(table->rows[0]->values[1].boolValue, true);
-  TEST_ASSERT_EQUAL_STRING(table->rows[0]->values[2].stringValue, "this is my message");
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[0]->values[0].intValue, 1);
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[0]->values[1].boolValue, true);
+  TEST_ASSERT_EQUAL_STRING(tables->tableList[0]->rows[0]->values[2].stringValue, "this is my message");
 
   freeCommand(insertCommand);
 }
@@ -68,7 +73,7 @@ void test_insertRecord_success_3cols_1row_twice(void) {
   char* insertInputOne = strdup(insertSqlOne);
   Command* insertCommandOne = parseInput(insertInputOne);
 
-  insertRecord(table, insertCommandOne);
+  insertRecord(tables, insertCommandOne);
   
   char insertSqlTwo[] = 
   "INSERT INTO myTable ( id, isDeleted, message )"
@@ -77,15 +82,15 @@ void test_insertRecord_success_3cols_1row_twice(void) {
   char* insertInputTwo = strdup(insertSqlTwo);
   Command* insertCommandTwo = parseInput(insertInputTwo);
 
-  insertRecord(table, insertCommandTwo);
+  insertRecord(tables, insertCommandTwo);
 
-  TEST_ASSERT_EQUAL(table->rows[0]->values[0].intValue, 1);
-  TEST_ASSERT_EQUAL(table->rows[0]->values[1].boolValue, true);
-  TEST_ASSERT_EQUAL_STRING(table->rows[0]->values[2].stringValue, "this is my message");
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[0]->values[0].intValue, 1);
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[0]->values[1].boolValue, true);
+  TEST_ASSERT_EQUAL_STRING(tables->tableList[0]->rows[0]->values[2].stringValue, "this is my message");
 
-  TEST_ASSERT_EQUAL(table->rows[1]->values[0].intValue, 2);
-  TEST_ASSERT_EQUAL(table->rows[1]->values[1].boolValue, false);
-  TEST_ASSERT_EQUAL_STRING(table->rows[1]->values[2].stringValue, "another message");
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[1]->values[0].intValue, 2);
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[1]->values[1].boolValue, false);
+  TEST_ASSERT_EQUAL_STRING(tables->tableList[0]->rows[1]->values[2].stringValue, "another message");
 
   freeCommand(insertCommandOne);
   freeCommand(insertCommandTwo);
@@ -102,15 +107,15 @@ void test_insertRecord_success_3cols_2rows(void) {
   char* insertInput = strdup(insertSql);
   Command* insertCommand = parseInput(insertInput);
 
-  insertRecord(table, insertCommand);
+  insertRecord(tables, insertCommand);
 
-  TEST_ASSERT_EQUAL(table->rows[0]->values[0].intValue, 1);
-  TEST_ASSERT_EQUAL(table->rows[0]->values[1].boolValue, true);
-  TEST_ASSERT_EQUAL_STRING(table->rows[0]->values[2].stringValue, "this is my message");
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[0]->values[0].intValue, 1);
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[0]->values[1].boolValue, true);
+  TEST_ASSERT_EQUAL_STRING(tables->tableList[0]->rows[0]->values[2].stringValue, "this is my message");
 
-  TEST_ASSERT_EQUAL(table->rows[1]->values[0].intValue, 2);
-  TEST_ASSERT_EQUAL(table->rows[1]->values[1].boolValue, false);
-  TEST_ASSERT_EQUAL_STRING(table->rows[1]->values[2].stringValue, "my second message");
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[1]->values[0].intValue, 2);
+  TEST_ASSERT_EQUAL(tables->tableList[0]->rows[1]->values[1].boolValue, false);
+  TEST_ASSERT_EQUAL_STRING(tables->tableList[0]->rows[1]->values[2].stringValue, "my second message");
 
   freeCommand(insertCommand);
 }
