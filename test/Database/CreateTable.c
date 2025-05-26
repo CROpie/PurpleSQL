@@ -43,7 +43,7 @@ void test_createTable_success_3cols(void) {
   
   command->c_numColPairs = 3;
 
-  command->c_colPairs = malloc(sizeof(ColPair) * command->c_numColPairs);
+  command->c_colPairs = calloc(sizeof(ColPair) * command->c_numColPairs, 1);
 
   command->c_colPairs[0].colName = strdup("id");
   command->c_colPairs[0].colDef  = strdup("INT");
@@ -71,6 +71,14 @@ void test_createTable_success_3cols(void) {
   TEST_ASSERT_EQUAL(COL_STRING, table->schema.columns[2].type);
 
   TEST_ASSERT_EQUAL(0, table->rowCount);
+
+  TEST_ASSERT_EQUAL(0, table->pageCount);
+  TEST_ASSERT_EQUAL(PAGE_CAPACITY, table->pageCapacity);
+
+  size_t rowSize = sizeof(Row) + sizeof(Value) * table->schema.columnCount;
+  int rowsPerPage = PAGE_SIZE / rowSize;
+  TEST_ASSERT_EQUAL(rowsPerPage, table->schema.rowsPerPage);
+
 
   // Clean up after the test
   freeCommand(command);

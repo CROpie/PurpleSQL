@@ -13,56 +13,38 @@ Tables* tables;
 
 void setUp(void) {
 
-  tables = malloc(sizeof(Tables));
-  tables->tableList = malloc(sizeof(Table*) * tables->tablesCapacity);
+  /* INITIALIZE TABLES ARRAY */
+  tables = calloc(sizeof(Tables), 1);
+  tables->tableList = calloc(sizeof(Table*) * tables->tablesCapacity, 1);
   tables->tableCount = 0;
 
-  Table* table = calloc(sizeof(Table), 1);
+  /* CREATE TABLE */
+  char createSql[] = 
+  "CREATE TABLE myTable (\n"
+  "id INT,\n"
+  "isDeleted BOOL,\n"
+  "message VARCHAR(255) );";
 
-  table->name = malloc(strlen("myTable") + 1);
-  strcpy(table->name, "myTable");
+  char* createInput = strdup(createSql);
+  Command* createCommand = parseInput(createInput);
+  tables->tableList[tables->tableCount++] = createTable(createCommand);
 
-  table->schema.columnCount = 3;
-  table->rowCapacity = ROW_CAPACITY;
+  /* INSERT INTO */
+  char insertSql[] = 
+  "INSERT INTO myTable (id, isDeleted, message)"
+  "VALUES (1, false, 'first message'), (2, true, 'second message');";
 
-  table->rows = malloc(sizeof(Row) * table->rowCapacity);
-
-  table->schema.columns = malloc(sizeof(ColumnSchema) * table->schema.columnCount);
-
-  strcpy(table->schema.columns[0].name, "id");
-  table->schema.columns[0].type = COL_INT;
-
-  strcpy(table->schema.columns[1].name, "isDeleted");
-  table->schema.columns[1].type = COL_BOOL;
-
-  strcpy(table->schema.columns[2].name, "message");
-  table->schema.columns[2].type = COL_STRING;
-
-  // MANUAL INSERT INTO
-  table->rows[0] = malloc(sizeof(Row));
-  table->rows[0]->isDeleted = false;
-  table->rows[0]->values = malloc(sizeof(Value) * table->schema.columnCount);
-
-  table->rows[0]->values[0].intValue = 1;
-  table->rows[0]->values[1].boolValue = false;
-  strcpy(table->rows[0]->values[2].stringValue, "first message");
-
-  table->rows[1] = malloc(sizeof(Row));
-  table->rows[1]->isDeleted = false;
-  table->rows[1]->values = malloc(sizeof(Value) * table->schema.columnCount);
-
-  table->rows[1]->values[0].intValue = 2;
-  table->rows[1]->values[1].boolValue = true;
-  strcpy(table->rows[1]->values[2].stringValue, "second message");
-
-  table->rowCount = 2;
-  tables->tableList[tables->tableCount++] = table;
+  char* insertInput = strdup(insertSql);
+  Command* insertCommand = parseInput(insertInput);
+  insertRecord(tables, insertCommand);
 }
 
 void tearDown(void) {
   freeTables(tables);
 }
 
+
+// 
 void test_selectWhere_success_star(void) {
   
   char selectSql[] = 

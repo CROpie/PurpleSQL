@@ -6,6 +6,8 @@
 #define ROW_CAPACITY 4
 #define SELECT_CAPACITY 4
 #define TABLE_CAPACITY 4
+#define PAGE_SIZE 4096
+#define PAGE_CAPACITY 1
 
 typedef enum {
     CMD_CREATE,
@@ -40,12 +42,13 @@ typedef struct {
 typedef struct {
   ColumnSchema* columns;
   int columnCount;
+  int rowsPerPage;
 } TableSchema;
 
 typedef union {
   int intValue;
   bool boolValue;
-  char stringValue[255];
+  char stringValue[64];
 } Value;
 
 /* Row -> Record instead? This will do for now*/
@@ -68,15 +71,20 @@ typedef struct {
 
 typedef struct {
   bool isDeleted;
-  Value* values;
+  Value values[];
 } Row;
+
+typedef struct {
+  __uint8_t data[PAGE_SIZE];
+} Page;
 
 typedef struct {
   char* name;
   TableSchema schema;
-  Row** rows;
   int rowCount;
-  int rowCapacity;
+  Page** pages;
+  int pageCount;
+  int pageCapacity;
 } Table;
 
 typedef struct {

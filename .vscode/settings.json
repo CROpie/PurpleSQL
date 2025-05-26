@@ -2,6 +2,7 @@
     "files.associations": {
         "stdbool.h": "c",
         "type_traits": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "database.h": "c"
     }
 }

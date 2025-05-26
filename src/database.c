@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "database.h"
+#include "encoder.h"
 
 void freeTable(Table* table) {
 
@@ -11,19 +12,16 @@ void freeTable(Table* table) {
 
   if (table->name) free(table->name);
 
+  if (table->pages) {
+    int pagesCount = (table->rowCount / table->schema.rowsPerPage) + 1;
+    for (int i = 0; i < pagesCount; i++) {
+      free(table->pages[i]);
+    }
+    free(table->pages);
+  }
+
   if (table->schema.columns) {
     free(table->schema.columns);
-  }
-
-  for (int i = 0; i < table->rowCount; i++) {
-    if (table->rows[i]->values) {
-      free(table->rows[i]->values);
-      free(table->rows[i]);
-    }
-  }
-
-  if (table->rows) {
-    free(table->rows);
   }
 
   free(table);
@@ -90,14 +88,12 @@ Table* createTable(Command* command) {
       return NULL;
   }      
 
-  Table* table = malloc(sizeof(Table));
+  Table* table = calloc(sizeof(Table), 1);
 
-  table->name = malloc(sizeof(command->tableName) + 1);
+  table->name = calloc(sizeof(command->tableName) + 1, 1);
   strcpy(table->name, command->tableName);
   table->schema.columnCount = command->c_numColPairs;
-  table->schema.columns = malloc(sizeof(ColumnSchema) * command->c_numColPairs);
-  table->rowCapacity = ROW_CAPACITY;
-  table->rows = malloc(sizeof(Row*) * table->rowCapacity);
+  table->schema.columns = calloc(sizeof(ColumnSchema) * command->c_numColPairs, 1);
   table->rowCount = 0;
 
   for (int i = 0; i < command->c_numColPairs; i++) {
@@ -108,8 +104,14 @@ Table* createTable(Command* command) {
     table->schema.columns[i].type = type;
   }
 
-  // table->rowCount = 0;
-  // table->rows = NULL;
+  table->pageCount = 0;
+  table->pageCapacity = PAGE_CAPACITY;
+
+  // sizeof(Row) does _not_ take into account the variable array value[]
+  size_t rowSize = sizeof(Row) + sizeof(Value) * table->schema.columnCount;
+  table->schema.rowsPerPage = PAGE_SIZE / rowSize;
+
+  table->pages = calloc(sizeof(Page*) * table->pageCapacity, 1);
 
   return table;
 }
@@ -133,15 +135,29 @@ void insertRecord(Tables* tables, Command* command) {
 
   int numCols = command->i_numColNames;
 
+  if (table->rowCount >= table->schema.rowsPerPage * table->pageCapacity) {
+    int oldCapacity = table->pageCapacity;
+    table->pageCapacity *= 2;
+    table->pages = realloc(table->pages, table->pageCapacity * sizeof(Page*));
+  }
+
+  int pageNumber = table->rowCount / table->schema.rowsPerPage;
+
+
+  if (!table->pages[pageNumber]) {
+    table->pages[pageNumber] = calloc(sizeof(Page), 1);
+
+  // read from file
+  }
+
   // fill up rows 1 by 1
   for (int colValueRowIndex = 0; colValueRowIndex < command->i_numValueRows; colValueRowIndex++) {
 
-    Row* newRow = malloc(sizeof(Row));
+    
+
+    Row* newRow = calloc(sizeof(Row) + sizeof(Value) * numCols, 1);
 
     newRow->isDeleted = false;
-
-    // malloc a row of values
-    newRow->values = malloc(sizeof(Value) * numCols);
 
     // iterate over i_colNames - need to determine the types
     for (int colNameIndex = 0; colNameIndex < numCols; colNameIndex++) {
@@ -184,14 +200,19 @@ void insertRecord(Tables* tables, Command* command) {
   }
 
   // reallocate if needed
-  if (table->rowCount >= table->rowCapacity) {
-    int oldCapacity = table->rowCapacity;
-    table->rowCapacity *= 2;
-    table->rows = realloc(table->rows, table->rowCapacity * sizeof(Row));
-  }
+  // if (table->rowCount >= table->rowCapacity) {
+  //   int oldCapacity = table->rowCapacity;
+  //   table->rowCapacity *= 2;
+  //   table->rows = realloc(table->rows, table->rowCapacity * sizeof(Row));
+  // }
 
-  table->rows[table->rowCount++] = newRow;
+  // remove this line when data stored to disk
+  // table->rows[table->rowCount++] = newRow;
+  int rowOffset = table->rowCount % table->schema.rowsPerPage;
+  serializeRowToPage(table, table->pages[pageNumber], newRow, rowOffset);
+  table->rowCount++;
 
+  // Row* testRow = deserializeRowFromPage(table, table->pages[pageNumber], rowOffset);
  }
 }
 
@@ -288,10 +309,52 @@ Selection* selectColumns(Tables* tables, Command* command) {
   selection->selectCapacity = SELECT_CAPACITY;
   selection->selectedRows = calloc(sizeof(SelectedRow) * selection->selectCapacity, 1);
 
+  /* One big buffer for all rows */
+  /*
+  Perhaps loop through pages, malloc + memCpy entire page, free page at the end (after copying the selected rows) ?
+
+
+  size_t rowSize = sizeof(Row) + sizeof(Value) * table->schema.columnCount;
+  Row* buffer = calloc(rowSize * table->rowCount);
+
+  determine number of pages
+  int pageCount = (table->rowCount / table->schema.rowsPerPage) + 1;
+
+  for (int pageNum = 0; pageNum < pageCount; pageNum++) {
+    if (!table->pages[pageNumber]) {
+      table->pages[pageNumber] = calloc(sizeof(Page), 1);
+    }
+
+  }
+
+  DeserializeAll (???)
+  char* src = (char*)page->data;
+  for (int i = 0; i < rowsPerPage; i++) {
+    Row* rowPtr = malloc(rowSize); // includes flexible array
+    memcpy(rowPtr, src, rowSize);
+    table->rows[currentRowIndex++] = rowPtr;
+    src += rowSize;
+}
+
+
+
+  */
+
+
   for (int rowIndex = 0; rowIndex < table->rowCount; rowIndex++) {
+    // inefficiently check page load every loop
+    int pageNumber = rowIndex / table->schema.rowsPerPage;
+    int rowOffset = rowIndex % table->schema.rowsPerPage;
+
+    if (!table->pages[pageNumber]) {
+      table->pages[pageNumber] = calloc(sizeof(Page), 1);
+    }
+    
+    Row* currentRow = deserializeRowFromPage(table, table->pages[pageNumber], rowIndex);
+
     int skip = 0;
 
-    if (table->rows[rowIndex]->isDeleted) continue;
+    if (currentRow->isDeleted) continue;
 
     if (command->s_whereClause) {
 
@@ -303,7 +366,7 @@ Selection* selectColumns(Tables* tables, Command* command) {
           continue;
         }
 
-        if (table->rows[rowIndex]->values[whereColumnInfo->columnIndex].intValue != val) skip = 1;
+        if (currentRow->values[whereColumnInfo->columnIndex].intValue != val) skip = 1;
       }
     }
 
@@ -320,7 +383,7 @@ Selection* selectColumns(Tables* tables, Command* command) {
     // iterate usedSchemaIndex array
     // each int in the array is the position in table->rows[N]->values[] array
     for (int usedSchemaIndex = 0; usedSchemaIndex < command->s_colNameCount; usedSchemaIndex++) {
-      selection->selectedRows[selection->selectedRowCount].values[usedSchemaIndex] = &table->rows[rowIndex]->values[selectColumnInfo[usedSchemaIndex].columnIndex];
+      selection->selectedRows[selection->selectedRowCount].values[usedSchemaIndex] = &currentRow->values[selectColumnInfo[usedSchemaIndex].columnIndex];
     }
     selection->selectedRowCount++;
   }

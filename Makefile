@@ -33,7 +33,7 @@ DEPEND = gcc -MM -MG -MF
 CFLAGS = -I. -I$(PATHU) -I$(PATHI) -g -DTEST 
 
 # Application object files used by tests (add all your core src .o files here)
-APP_OBJS = $(PATHO)database.o $(PATHO)repl.o $(PATHO)appmain.o
+APP_OBJS = $(PATHO)database.o $(PATHO)repl.o $(PATHO)appmain.o $(PATHO)encoder.o
 
 # Test source files (you can keep this for bulk test file discovery)
 SRCT = $(wildcard $(PATHT)**/*.c)
