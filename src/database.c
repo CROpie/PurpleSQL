@@ -43,20 +43,31 @@ void freeSelection(Selection* selection) {
 }
 
 bool validateCreateTableCommand(Command* command) {
+  
   bool hasPassedValidation = true;
+
+  char errMsg[1024];
+  errMsg[0] = '\0';
+
   if (!command->tableName) {
-    printf("No table name. Aborting.\n");
+    strcat(errMsg, "Error: No table name.\n");
     hasPassedValidation = false;
   }
 
   if (!command->c_numColPairs) {
-    printf("No column count. Aborting. \n");
+    strcat(errMsg, "Error: No columns.\n");
     hasPassedValidation = false;
   }
 
   if (!command->c_colPairs) {
-    printf("No column definitions. Aborting. \n");
+    strcat(errMsg, "Error: No column definitions.\n");
     hasPassedValidation = false;
+  }
+
+  if (!hasPassedValidation) {
+    command->e_message = calloc(strlen(errMsg) + 1, 1);
+    strcpy(command->e_message, errMsg);
+    command->type = CMD_ERROR;
   }
 
   return hasPassedValidation;
@@ -101,6 +112,13 @@ Table* createTable(Command* command) {
 
     ColumnType type = convertStrToColumnType(command->c_colPairs[i].colDef);
 
+    if (type == COL_UNDEFINED) {
+      command->e_message = strdup("Error: Unknown column type.\n");
+      command->type = CMD_ERROR;
+      freeTable(table);
+      return NULL;
+    }
+
     table->schema.columns[i].type = type;
   }
 
@@ -111,16 +129,23 @@ Table* createTable(Command* command) {
   size_t rowSize = sizeof(Row) + sizeof(Value) * table->schema.columnCount;
   table->schema.rowsPerPage = PAGE_SIZE / rowSize;
 
+  if (table->schema.rowsPerPage == 0) {
+      command->e_message = strdup("Error: Too many columns.\n");
+      command->type = CMD_ERROR;
+      freeTable(table);
+      return NULL;
+  }
+
   table->pages = calloc(sizeof(Page*) * table->pageCapacity, 1);
 
   return table;
 }
 
-void insertRecord(Tables* tables, Command* command) {
+bool insertRecord(Tables* tables, Command* command) {
 
-  Table* table;
+  Table* table = NULL;
 
-  // find table based on tableName
+  // find table based on tableName 
   for (int i = 0; i < tables->tableCount; i++) {
     if (strcmp(tables->tableList[i]->name, command->tableName) == 0) {
       table = tables->tableList[i];
@@ -128,32 +153,63 @@ void insertRecord(Tables* tables, Command* command) {
     }
   }
 
- if (command->i_numColNames > table->schema.columnCount) {
-  printf("Schema mismatch: to many columns entered.\n");
-  return;
+  if (!table) {
+    command->e_message = strdup("Error: table not found.\n");
+    command->type = CMD_ERROR;
+    return false;
+  }
+
+ // check that all columns in command exist in table schema
+ for (int i = 0; i < command->i_numColNames; i++) {
+  bool found = false;
+
+  for (int j = 0; j < table->schema.columnCount; j++) {
+    if (strcmp(command->i_colNames[i], table->schema.columns[j].name) == 0) found = true;
+  }
+
+  if (!found) {
+    command->e_message = strdup("Error: unrecognized column entered.\n");
+    command->type = CMD_ERROR;
+    return false;
+  }
+
+ }
+
+  // ensure no column duplicates
+ for (int i = 0; i < command->i_numColNames; i++) {
+  bool found = false;
+
+  for (int j = i + 1; j < command->i_numColNames; j++) {
+    if (strcmp(command->i_colNames[i], command->i_colNames[j]) == 0) found = true;
+  }
+
+  if (found) {
+    command->e_message = strdup("Error: duplicate column detected.\n");
+    command->type = CMD_ERROR;
+    return false;
+  }
+
  }
 
   int numCols = command->i_numColNames;
 
-  if (table->rowCount >= table->schema.rowsPerPage * table->pageCapacity) {
-    int oldCapacity = table->pageCapacity;
-    table->pageCapacity *= 2;
-    table->pages = realloc(table->pages, table->pageCapacity * sizeof(Page*));
-  }
 
-  int pageNumber = table->rowCount / table->schema.rowsPerPage;
-
-
-  if (!table->pages[pageNumber]) {
-    table->pages[pageNumber] = calloc(sizeof(Page), 1);
-
-  // read from file
-  }
 
   // fill up rows 1 by 1
   for (int colValueRowIndex = 0; colValueRowIndex < command->i_numValueRows; colValueRowIndex++) {
 
-    
+    if (table->rowCount >= table->schema.rowsPerPage * table->pageCapacity) {
+      int oldCapacity = table->pageCapacity;
+      table->pageCapacity *= 2;
+      table->pages = realloc(table->pages, table->pageCapacity * sizeof(Page*));
+    }
+
+    int pageNumber = table->rowCount / table->schema.rowsPerPage;
+
+
+    if (!table->pages[pageNumber]) {
+      table->pages[pageNumber] = calloc(sizeof(Page), 1);
+    }
 
     Row* newRow = calloc(sizeof(Row) + sizeof(Value) * numCols, 1);
 
@@ -162,7 +218,6 @@ void insertRecord(Tables* tables, Command* command) {
     // iterate over i_colNames - need to determine the types
     for (int colNameIndex = 0; colNameIndex < numCols; colNameIndex++) {
 
-      // attempt to find matching column
       for (int schemaColNameIndex = 0; schemaColNameIndex < numCols; schemaColNameIndex++) {
 
         // search for match
@@ -176,7 +231,9 @@ void insertRecord(Tables* tables, Command* command) {
             char* endptr;
             int val = (int) strtol(str, &endptr, 10);
             if (*endptr != '\0') {
-              printf("Invalid input: could not convert %s to int\n", str);
+              command->e_message = strdup("Error: Value not int.\n");
+              command->type = CMD_ERROR;
+              break;
             }
             newRow->values[colNameIndex].intValue = val;
             break;
@@ -186,34 +243,37 @@ void insertRecord(Tables* tables, Command* command) {
             } else if (strcmp(str, "false") == 0) {
               newRow->values[colNameIndex].boolValue = false;
             } else {
-              printf("Invalid input: could not convert %s to bool\n", str);
+              command->e_message = strdup("Error: Value not bool.\n");
+              command->type = CMD_ERROR;
             }
             break;
           case COL_STRING:
+            if (strlen(str) >= sizeof(newRow->values[colNameIndex].stringValue) - 1) {
+              command->e_message = strdup("Error: String is too long.\n");
+              command->type = CMD_ERROR;
+            } else {
               strcpy(newRow->values[colNameIndex].stringValue, str);
-              // add a check to see if string got truncated / will be truncated, since it is not char* but char[len]
+            }
             break;
           default:
-            printf("unrecognized type");
+              command->e_message = strdup("Error: Unrecognized type.\n");
+              command->type = CMD_ERROR;
+        }
+        if (command->type == CMD_ERROR) {
+          free(newRow);
+          // other things need to be freed here too...
+          return false;
         }
     }
   }
 
-  // reallocate if needed
-  // if (table->rowCount >= table->rowCapacity) {
-  //   int oldCapacity = table->rowCapacity;
-  //   table->rowCapacity *= 2;
-  //   table->rows = realloc(table->rows, table->rowCapacity * sizeof(Row));
-  // }
-
-  // remove this line when data stored to disk
-  // table->rows[table->rowCount++] = newRow;
   int rowOffset = table->rowCount % table->schema.rowsPerPage;
   serializeRowToPage(table, table->pages[pageNumber], newRow, rowOffset);
   table->rowCount++;
 
-  // Row* testRow = deserializeRowFromPage(table, table->pages[pageNumber], rowOffset);
  }
+
+   return true;
 }
 
 void printSelection(Table* table, Selection* selection, int columnCount, SelectColumnInfo* selectColumnInfo) {
@@ -245,7 +305,7 @@ void printSelection(Table* table, Selection* selection, int columnCount, SelectC
 
 Selection* selectColumns(Tables* tables, Command* command) {
 
-  Table* table;
+  Table* table = NULL;
 
   // find table based on tableName
   for (int i = 0; i < tables->tableCount; i++) {
@@ -254,6 +314,14 @@ Selection* selectColumns(Tables* tables, Command* command) {
       break;
     }
   }
+
+  if (!table) {
+    command->e_message = strdup("Error: table not found.\n");
+    command->type = CMD_ERROR;
+    return NULL;
+  } 
+
+
 
   // printf("s_all: %d\n", command->s_all);
 
@@ -267,6 +335,39 @@ Selection* selectColumns(Tables* tables, Command* command) {
       strncpy(command->s_colNames[schemaColIndex], table->schema.columns[schemaColIndex].name, strlen(table->schema.columns[schemaColIndex].name));
     }
   }
+
+     // check that all columns in command exist in table schema 
+ for (int i = 0; i < command->s_colNameCount; i++) {
+  bool found = false;
+
+  for (int j = 0; j < table->schema.columnCount; j++) {
+    if (strcmp(command->s_colNames[i], table->schema.columns[j].name) == 0) found = true;
+  }
+
+  if (!found) {
+    command->e_message = strdup("Error: unrecognized column entered.\n");
+    command->type = CMD_ERROR;
+    return NULL;
+  }
+ }
+
+  // ensure no column duplicates
+ for (int i = 0; i < command->s_colNameCount; i++) {
+  bool found = false;
+
+  for (int j = i + 1; j < command->s_colNameCount; j++) {
+    if (strcmp(command->s_colNames[i], command->s_colNames[j]) == 0) found = true;
+  }
+
+  if (found) {
+    command->e_message = strdup("Error: duplicate column detected.\n");
+    command->type = CMD_ERROR;
+    return NULL;
+  }
+ }
+
+ // check where column exists
+
 
   SelectColumnInfo* selectColumnInfo = malloc(sizeof(SelectColumnInfo) * command->s_colNameCount);
   int selectColumnInfoCount = 0;
@@ -290,13 +391,23 @@ Selection* selectColumns(Tables* tables, Command* command) {
   if (command->s_whereClause) {
     whereColumnInfo = malloc(sizeof(SelectColumnInfo));
 
+    bool found = false;
     for (int commandColIndex = 0; commandColIndex < command->s_colNameCount; commandColIndex++) {
+
       if (strcmp(command->s_colNames[commandColIndex], command->s_whereClause->w_column) == 0) {
         whereColumnInfo->columnIndex = commandColIndex;
         whereColumnInfo->columnType = table->schema.columns[commandColIndex].type;
+        found = true;
         break;
       }
     }
+
+    if (!found) {
+      command->e_message = strdup("Error: unrecognized where column entered.\n");
+      command->type = CMD_ERROR;
+      return NULL;
+    }
+    
 
     if (strcmp(command->s_whereClause->w_operator, "=") == 0) {
       whereClauseOperand = OP_EQ;
@@ -337,7 +448,6 @@ Selection* selectColumns(Tables* tables, Command* command) {
 }
 
 
-
   */
 
 
@@ -352,25 +462,28 @@ Selection* selectColumns(Tables* tables, Command* command) {
     
     Row* currentRow = deserializeRowFromPage(table, table->pages[pageNumber], rowIndex);
 
-    int skip = 0;
-
     if (currentRow->isDeleted) continue;
 
     if (command->s_whereClause) {
 
-      if (whereClauseOperand == OP_EQ) {
-        char* endptr;
-        int val = (int) strtol(command->s_whereClause->w_value, &endptr, 10);
-        if (*endptr != '\0') {
-          printf("Invalid input: could not convert %s to int\n", command->s_whereClause->w_value);
-          continue;
-        }
+      switch (whereClauseOperand) {
+        case OP_EQ:
+          char* endptr;
+          int val = (int) strtol(command->s_whereClause->w_value, &endptr, 10);
+          if (*endptr != '\0') {
+            command->e_message = strdup("Error: invalid input: could not convert str to int.\n");
+            command->type = CMD_ERROR;
+            return NULL;
+          }
+          if (currentRow->values[whereColumnInfo->columnIndex].intValue != val) continue;
+          break;
 
-        if (currentRow->values[whereColumnInfo->columnIndex].intValue != val) skip = 1;
+        default:
+          command->e_message = strdup("Error: unrecognized operator.\n");
+          command->type = CMD_ERROR;
+          return NULL;
       }
     }
-
-    if (skip) continue;
 
     if (selection->selectedRowCount >= selection->selectCapacity) {
       int oldCapacity = selection->selectCapacity;
@@ -389,8 +502,6 @@ Selection* selectColumns(Tables* tables, Command* command) {
   }
 
   printSelection(table, selection, command->s_colNameCount, selectColumnInfo);
-
-  // printf("{ 1, false, 'first message', }\n");
 
   // free(selectColumnInfo);
   if (whereColumnInfo) free(whereColumnInfo);

@@ -322,7 +322,7 @@ char** insertInto_extractColumns(char** pPtr, int* colCount) {
 	int capacity = 4;
 	int count = 0;
 
-	char** columns = malloc(capacity * sizeof(char*));
+	char** columns = calloc(capacity * sizeof(char*), 1);
 
 	while (openParens > 0) {
 
@@ -591,7 +591,7 @@ void parseInsert(char* input, Command* command) {
 		return;
 	}
 
-	/* get the column names first */
+	/* get the column names first */ 
 	int i_numColNames = 0;
 	char** i_colNames = insertInto_extractColumns(&p, &i_numColNames);
 	command->i_numColNames = i_numColNames;
@@ -606,6 +606,12 @@ void parseInsert(char* input, Command* command) {
 		int valCount = 0;
 		char** colValueRow = insertInto_extractColumns(&p, &valCount);
 
+		if (valCount != i_numColNames) {
+			command->e_message = strdup("Error: Mismatch between number of columns and values.\n");
+			command->type = CMD_ERROR;
+			return;
+		}
+
 		if (i_numValueRows >= colValueRowsCapacity) {
 			colValueRowsCapacity *= 2;
 			command->i_colValueRows = realloc(command->i_colValueRows, colValueRowsCapacity * sizeof(char*));
@@ -616,6 +622,9 @@ void parseInsert(char* input, Command* command) {
 		i_numValueRows++;
 		if (*p != '\0') p++;
 	}
+
+
+
 	command->i_numValueRows = i_numValueRows;
 
 }

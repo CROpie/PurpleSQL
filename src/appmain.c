@@ -29,22 +29,39 @@ int appMain() {
 
     Command* command = parseInput(input);
     switch (command->type) {
+
       case CMD_CREATE:
         tables->tableList[tables->tableCount++] = createTable(command);
-        printf("Table creation successful.\n");
+        if (command->type == CMD_ERROR) {
+          printf("Failed to create table:\n, %s", command->e_message);
+        } else {
+          printf("Table creation successful.\n");
+        }
         break;
+
       case CMD_INSERT:
-        insertRecord(tables, command);
-        printf("Record insertion successful.\n");
+        if (insertRecord(tables, command)) {
+          printf("Record insertion successful.\n");
+        } else {
+          printf("Failed to insert row:\n, %s", command->e_message);
+        }
         break;
+
       case CMD_SELECT:
         Selection* selection = selectColumns(tables, command);
-        freeSelection(selection);
+        if (!selection) {
+          // do stg
+        } else {
+          freeSelection(selection);
+        }
+
         break;
+
       case CMD_EXIT:
         printf("goodbyte\n");
         isContinue = false;
         break;
+        
       case CMD_UNDEFINED:
       default:
         printf("Unrecognized command\n");

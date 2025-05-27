@@ -8,6 +8,7 @@
 #define TABLE_CAPACITY 4
 #define PAGE_SIZE 4096
 #define PAGE_CAPACITY 1
+#define VARCHAR_LENGTH 64
 
 typedef enum {
     CMD_CREATE,
@@ -48,7 +49,7 @@ typedef struct {
 typedef union {
   int intValue;
   bool boolValue;
-  char stringValue[64];
+  char stringValue[VARCHAR_LENGTH];
 } Value;
 
 /* Row -> Record instead? This will do for now*/
@@ -131,7 +132,7 @@ typedef struct {
 } Command;
 
 Table* createTable(Command* command);
-void insertRecord(Tables* tables, Command* command);
+bool insertRecord(Tables* tables, Command* command);
 Selection* selectColumns(Tables* tables, Command* command);
 void freeTable(Table* table);
 void freeTables(Tables* tables);
