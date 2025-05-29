@@ -17,7 +17,7 @@ int appMain() {
   
   while (isContinue) {
     printHome();
-    // printf("db > "); 
+    // printf("db > ");
     char* input = getInput();
   
     if (!input) {
@@ -35,23 +35,35 @@ int appMain() {
         } else {
           tables->tableList[tables->tableCount++] = newTable;
           printf("Table creation successful.\n");
+          saveTablesMetadata(tables, "purpleSQL.db");
         }
         break;
 
       case CMD_INSERT:
         if (insertRecord(tables, command)) {
           printf("Record insertion successful.\n");
+          saveTablesMetadata(tables, "purpleSQL.db");
         } else {
-          printf("Failed to insert row:\n, %s", command->e_message);
+          printf("Failed to insert row. %s\n", command->e_message);
         }
         break;
 
       case CMD_SELECT:
         Selection* selection = selectColumns(tables, command);
-        if (!selection) {
-          // do stg
+
+        if (command->type == CMD_ERROR) {
+          printf("Failed to retrieve data. %s\n", command->e_message);
         } else {
           freeSelection(selection);
+        }
+        break;
+
+      case CMD_DROP:
+        if (dropTable(tables, command)) {
+          printf("Table deleted.\n");
+          saveTablesMetadata(tables, "purpleSQL.db");
+        } else {
+          printf("%s\n", command->e_message);
         }
 
         break;
@@ -67,8 +79,9 @@ int appMain() {
     }
 
   freeCommand(command);
+
   }
-  saveTablesMetadata(tables, "purpleSQL.db");
+  
 
   // freeTable(table);
 

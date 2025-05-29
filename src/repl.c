@@ -569,7 +569,7 @@ void parseCreate(char* input, Command* command) {
 		return;	
 	}
 
-  char* p = input + strlen("CREATE TABLE");
+    char* p = input + strlen("CREATE TABLE");
 
 	command->tableName = extractTableName(&p);
 
@@ -667,6 +667,12 @@ void parseSelect(char* input, Command* command) {
 	}
 }
 
+void parseDrop(char* input, Command* command) {
+	char* p = input + strlen("DROP TABLE");
+
+	command->tableName = extractTableName(&p);
+}
+
 char* getInput() {
   char buffer[128];
   char* input = calloc(INPUT_LENGTH, 1);
@@ -696,7 +702,7 @@ Command* parseInput(char* input) {
   // Remove whitespace
   trimWhitespace(input);
 
-	// check that equal numbers of [()'] (unless inside quotes) 
+	// check that equal numbers of [()'] (unless inside quotes)
 	if (!checkBalancedParensAndQuotes(input)) {
 		command->type = CMD_ERROR;
 		command->e_message = writeError("Syntax error: parens or quotes are not balanced.");
@@ -722,9 +728,14 @@ Command* parseInput(char* input) {
     parseInsert(input, command);
   }
 
-    if (strncmp(input, "SELECT ", 7) == 0) {
+  if (strncmp(input, "SELECT ", 7) == 0) {
     command->type = CMD_SELECT;
     parseSelect(input, command);
+  }
+
+  if (strncmp(input, "DROP TABLE ", 11) == 0) {
+    command->type = CMD_DROP;
+    parseDrop(input, command);
   }
 
   if (strncmp(input, "exit", 4) == 0) {

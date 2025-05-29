@@ -81,9 +81,10 @@ void test_main_output(void) {
     stdout = tempOut;
 
     char input[] = 
-        "CREATE TABLE myTable ( id INT, isDeleted BOOL, message VARCHAR(255) );\n"
-        "INSERT INTO myTable ( id, isDeleted, message ) VALUES (1, false, 'first message');\n"
-        "SELECT * FROM myTable;\n"
+        "CREATE TABLE testTable ( id INT, isDeleted BOOL, message VARCHAR(255) );\n"
+        "INSERT INTO testTable ( id, isDeleted, message ) VALUES (1, false, 'first message');\n"
+        "SELECT * FROM testTable;\n"
+        "DROP TABLE testTable;\n"
         "exit;\n"
     ;
 
@@ -91,6 +92,7 @@ void test_main_output(void) {
         "Table creation successful.",
         "Record insertion successful.",
         "{ 1, false, 'first message', }",
+        "Table deleted.",
         "goodbyte"
     };
 
@@ -133,8 +135,8 @@ void test_main_output(void) {
 int main(void) {
     UNITY_BEGIN();
 
-//    RUN_TEST(test_main_output);
-   RUN_TEST(test_two_tables);
+   RUN_TEST(test_main_output);
+//  RUN_TEST(test_two_tables);
 
     return UNITY_END();
 }

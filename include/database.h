@@ -15,6 +15,7 @@ typedef enum {
     CMD_CREATE,
     CMD_INSERT,
     CMD_SELECT,
+    CMD_DROP,
     CMD_UNDEFINED,
     CMD_EXIT,
     CMD_ERROR
@@ -135,6 +136,8 @@ typedef struct {
 Table* createTable(Tables* tables, Command* command);
 bool insertRecord(Tables* tables, Command* command);
 Selection* selectColumns(Tables* tables, Command* command);
+bool dropTable(Tables* table, Command* command);
+
 void freeTable(Table* table);
 void freeTables(Tables* tables);
 void freeSelection(Selection* selection);

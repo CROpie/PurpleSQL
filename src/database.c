@@ -136,7 +136,7 @@ Table* createTable(Tables* tables, Command* command) {
   table->pageCount = 0;
   table->pageCapacity = PAGE_CAPACITY;
 
-  // sizeof(Row) does _not_ take into account the variable array value[]
+  // sizeof(Row) does _not_ take into account the variable array value[] 
   size_t rowSize = sizeof(Row) + sizeof(Value) * table->schema.columnCount;
   table->schema.rowsPerPage = PAGE_SIZE / rowSize;
 
@@ -505,7 +505,7 @@ Selection* selectColumns(Tables* tables, Command* command) {
     selection->selectedRows[selection->selectedRowCount].values = malloc(sizeof(Value*) * command->s_colNameCount);
 
     // iterate usedSchemaIndex array
-    // each int in the array is the position in table->rows[N]->values[] array
+    // each int in the array is the position in table->rows[N]->values[] array 
     for (int usedSchemaIndex = 0; usedSchemaIndex < command->s_colNameCount; usedSchemaIndex++) {
       selection->selectedRows[selection->selectedRowCount].values[usedSchemaIndex] = &currentRow->values[selectColumnInfo[usedSchemaIndex].columnIndex];
     }
@@ -517,5 +517,57 @@ Selection* selectColumns(Tables* tables, Command* command) {
   // free(selectColumnInfo);
   if (whereColumnInfo) free(whereColumnInfo);
 
+  if (selection->selectedRows == 0) {
+    printf("No rows returned!\n");
+  }
+
   return selection;
+}
+
+bool dropTable(Tables* tables, Command* command) {
+  
+  int dropTableIndex = -1;
+  for (int i = 0; i < tables->tableCount; i++) {
+    if (!tables->tableList[i]) continue;
+    
+    if (strcmp(tables->tableList[i]->name, command->tableName) == 0) {
+      dropTableIndex = i;
+      break;
+    }
+  }
+
+  if (dropTableIndex == -1) {
+    command->e_message = strdup("Error: table doesn't exist.\n");
+    command->type = CMD_ERROR;
+    return false;
+  }
+
+  int result = deleteTableData(tables->tableList[dropTableIndex]->name);
+  command->type = CMD_ERROR;
+  switch (result) {
+    case 0:
+      command->type = CMD_DROP;
+      break;
+    case -1:
+      command->e_message = strdup("Error: failed to delete table metadata.\n");
+      break;
+    case -2:
+      command->e_message = strdup("Error: failed to delete table data.\n");
+      break;
+    case -3:
+      command->e_message = strdup("Error: failed to delete table directory.\n");
+      break;
+    default:
+  }
+
+  if (command->type == CMD_ERROR) return false;
+
+  freeTable(tables->tableList[dropTableIndex]);
+
+  for (int i = dropTableIndex; i < tables->tableCount - 1; i++) {
+    tables->tableList[i] = tables->tableList[i + 1];
+  }
+  tables->tableCount--;
+  tables->tableList[tables->tableCount] = NULL;
+  return true;
 }

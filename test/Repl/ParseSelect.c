@@ -151,7 +151,7 @@ void test_parseInput_Select_star_Where_truncated(void) {
 
   TEST_ASSERT_NULL(command->s_whereClause);
 
-  // Clean up after the test
+  // Clean up after the test 
   freeCommand(command);
 }
 

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include <sys/stat.h> // mkdir
+#include <unistd.h> // rmdir
 #include <sys/types.h>
 #include <errno.h>
 
@@ -248,4 +249,23 @@ Tables* loadTablesMetadata(char* dbName) {
   }
   fclose(fp);
   return tables;
+}
+
+int deleteTableData(char* tableName) {
+  char dir[MAX_DIR];
+  snprintf(dir, sizeof(dir), DB_DIR "/%s", tableName);
+
+  char metaPath[MAX_PATH];
+  snprintf(metaPath, sizeof(metaPath), "%s/%s.meta", dir, tableName);
+
+  char dataPath[MAX_PATH];
+  snprintf(dataPath, sizeof(dataPath), "%s/%s.db", dir, tableName);
+
+  if (remove(metaPath) != 0) return -1;
+
+  if (remove(dataPath) != 0) return -2;
+  
+  if (rmdir(dir) != 0) return -3;
+
+  return 0;
 }

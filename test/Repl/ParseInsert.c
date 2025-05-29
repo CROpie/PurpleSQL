@@ -110,7 +110,7 @@ void test_parseInput_InsertInto_fail_not_escaped_quotation(void) {
   TEST_ASSERT_NULL(command->i_colNames);
   TEST_ASSERT_NULL(command->i_colValueRows);
 
-  // Clean up after the test
+  // Clean up after the test 
   freeCommand(command);
 }
 

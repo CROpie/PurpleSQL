@@ -186,7 +186,7 @@ void test_parseInput_CreateTable_noTableName(void) {
 
   TEST_ASSERT_EQUAL_STRING("", command->tableName);
 
-  // Clean up after the test
+  // Clean up after the test 
   freeCommand(command);
 }
 

@@ -1,6 +1,8 @@
 #ifndef ENCODER_H
 #define ENCODER_H
 
+#include <stdbool.h>
+
 #include "database.h"
 
 #define DB_DIR "data"
@@ -11,5 +13,7 @@ void serializeRowToPage(Table* table, Page* page, Row* row, int rowIndex);
 Row* deserializeRowFromPage(Table* table, Page* page, int rowIndex);
 void saveTablesMetadata(Tables* tables, char* dbName);
 Tables* loadTablesMetadata(char* dbName);
+
+int deleteTableData(char* tableName);
 
 #endif
