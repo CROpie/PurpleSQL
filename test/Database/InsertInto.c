@@ -29,6 +29,7 @@ char* makeRepeatedCharString(char ch, size_t N) {
 void setUp(void) {
 
   tables = calloc(sizeof(Tables), 1);
+  tables->tablesCapacity = TABLE_CAPACITY;
   tables->tableList = calloc(sizeof(Table*) * tables->tablesCapacity, 1);
   tables->tableCount = 0;
 
@@ -40,13 +41,16 @@ void setUp(void) {
 
   createInput = strdup(sql);
   createCommand = parseInput(createInput);
-  tables->tableList[tables->tableCount++] = createTable(createCommand);
+  tables->tableList[tables->tableCount++] = createTable(tables, createCommand);
 }
 
 void tearDown(void) {
   freeTables(tables);
   freeCommand(createCommand);
   freeCommand(insertCommand);
+  // tables = NULL;
+  // createCommand = NULL;
+  // insertCommand = NULL;
 }
 
 void test_insertRecord_fail_not_int(void) {

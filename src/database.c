@@ -92,12 +92,23 @@ ColumnType convertStrToColumnType(char* colDef) {
   return type;
 }
 
-Table* createTable(Command* command) {
+Table* createTable(Tables* tables, Command* command) {
 
-  // Ensure command has all required fields
+  // Ensure command has all required fields 
   if (!validateCreateTableCommand(command)) {
       return NULL;
-  }      
+  }
+
+  // find table based on tableName
+  for (int i = 0; i < tables->tableCount; i++) {
+    if (!tables->tableList[i]) continue;
+    
+    if (strcmp(tables->tableList[i]->name, command->tableName) == 0) {
+      command->e_message = strdup("Error: table already exists.\n");
+      command->type = CMD_ERROR;
+      return NULL;
+    }
+  }
 
   Table* table = calloc(sizeof(Table), 1);
 

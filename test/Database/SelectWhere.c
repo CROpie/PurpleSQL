@@ -31,7 +31,7 @@ void setUp(void) {
 
   char* createInput = strdup(createSql);
   Command* createCommand = parseInput(createInput);
-  tables->tableList[tables->tableCount++] = createTable(createCommand);
+  tables->tableList[tables->tableCount++] = createTable(tables, createCommand);
 
   /* INSERT INTO */
   char insertSql[] = 

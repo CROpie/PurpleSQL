@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-// appMain is a wrapper for main to allow for unit tests of the main function itself
+// appMain is a wrapper for main to allow for unit tests of the main function itself.
 int appMain();
 
 int main() {

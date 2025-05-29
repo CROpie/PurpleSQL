@@ -9,6 +9,7 @@
 #define PAGE_SIZE 4096
 #define PAGE_CAPACITY 1
 #define VARCHAR_LENGTH 64
+#define MAX_TABLE_NAME 32
 
 typedef enum {
     CMD_CREATE,
@@ -131,7 +132,7 @@ typedef struct {
     char* e_message;
 } Command;
 
-Table* createTable(Command* command);
+Table* createTable(Tables* tables, Command* command);
 bool insertRecord(Tables* tables, Command* command);
 Selection* selectColumns(Tables* tables, Command* command);
 void freeTable(Table* table);

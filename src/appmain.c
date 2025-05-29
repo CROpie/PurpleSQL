@@ -4,6 +4,7 @@
 
 #include "repl.h"
 #include "database.h"
+#include "encoder.h"
 
 void printHome() {
   fprintf(stderr, "db > ");
@@ -12,14 +13,11 @@ void printHome() {
 int appMain() {
   bool isContinue = true;
 
-  Tables* tables = malloc(sizeof(Tables));
-  tables->tablesCapacity = TABLE_CAPACITY;
-  tables->tableList = malloc(sizeof(Table*) * tables->tablesCapacity);
-  tables->tableCount = 0;
+  Tables* tables = loadTablesMetadata("purpleSQL.db");
   
   while (isContinue) {
     printHome();
-    // printf("db > ");
+    // printf("db > "); 
     char* input = getInput();
   
     if (!input) {
@@ -31,10 +29,11 @@ int appMain() {
     switch (command->type) {
 
       case CMD_CREATE:
-        tables->tableList[tables->tableCount++] = createTable(command);
+         Table* newTable = createTable(tables, command);
         if (command->type == CMD_ERROR) {
           printf("Failed to create table:\n, %s", command->e_message);
         } else {
+          tables->tableList[tables->tableCount++] = newTable;
           printf("Table creation successful.\n");
         }
         break;
@@ -69,6 +68,7 @@ int appMain() {
 
   freeCommand(command);
   }
+  saveTablesMetadata(tables, "purpleSQL.db");
 
   // freeTable(table);
 

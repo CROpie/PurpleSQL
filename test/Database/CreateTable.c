@@ -7,19 +7,24 @@
 #include "database.h"
 #include "testHelpers.h"
 
-Table* table;
+Tables* tables;
 Command* command;
 
 // SETUP : 
 // TESTS : Write Command, run CreateTable
 
 void setUp(void) {
-  //
+  tables = calloc(sizeof(Tables), 1);
+  tables->tablesCapacity = TABLE_CAPACITY;
+  tables->tableList = calloc(sizeof(Table*) * tables->tablesCapacity, 1);
+  tables->tableCount = 0;
 }
 
 void tearDown(void) {
   freeCommand(command);
-  freeTable(table);
+  freeTables(tables);
+  // command = NULL;
+  // table = NULL;
 }
 
 void test_createTable_fail_no_tableName(void) {
@@ -38,9 +43,9 @@ void test_createTable_fail_no_tableName(void) {
   command->c_colPairs[2].colName = strdup("message");
   command->c_colPairs[2].colDef  = strdup("VARCHAR(255)");
 
-  table = createTable(command);
+  tables->tableList[tables->tableCount++] = createTable(tables, command);
 
-  TEST_ASSERT_NULL(table);
+  TEST_ASSERT_NULL(tables->tableList[tables->tableCount]);
 
   TEST_ASSERT_STRING_CONTAINS("Error: No table name", command->e_message);
 }
@@ -54,9 +59,9 @@ void test_createTable_fail_no_columns(void) {
 
   command->c_numColPairs = 0;
 
-  table = createTable(command);
+  tables->tableList[tables->tableCount++] = createTable(tables, command);
 
-  TEST_ASSERT_NULL(table);
+  TEST_ASSERT_NULL(tables->tableList[tables->tableCount]);
 
   TEST_ASSERT_STRING_CONTAINS("Error: No columns", command->e_message);
   TEST_ASSERT_STRING_CONTAINS("Error: No column definitions", command->e_message);
@@ -82,9 +87,9 @@ void test_createTable_fail_unknown_column_type(void) {
   command->c_colPairs[2].colName = strdup("message");
   command->c_colPairs[2].colDef  = strdup("VARCHAR(255)");
 
-  table = createTable(command);
+  tables->tableList[tables->tableCount++] = createTable(tables, command);
 
-  TEST_ASSERT_NULL(table);
+  TEST_ASSERT_NULL(tables->tableList[tables->tableCount]);
 
   TEST_ASSERT_STRING_CONTAINS("Error: Unknown column type", command->e_message);
 }
@@ -108,9 +113,9 @@ void test_createTable_fail_too_many_columns(void) {
     command->c_colPairs[i].colDef  = strdup("INT"); 
   }
 
-  table = createTable(command);
+  tables->tableList[tables->tableCount++] = createTable(tables, command);
 
-  TEST_ASSERT_NULL(table);
+  TEST_ASSERT_NULL(tables->tableList[tables->tableCount]);
 
   TEST_ASSERT_STRING_CONTAINS("Error: Too many columns", command->e_message);
 }
@@ -136,7 +141,11 @@ void test_createTable_success_3cols(void) {
   command->c_colPairs[2].colName = strdup("message");
   command->c_colPairs[2].colDef  = strdup("VARCHAR(255)");
 
-  table = createTable(command);
+  int tableIndex = tables->tableCount;
+
+  tables->tableList[tables->tableCount++] = createTable(tables, command);
+
+  Table* table = tables->tableList[tableIndex];
 
   TEST_ASSERT_NOT_NULL(table);
   TEST_ASSERT_EQUAL_STRING("myTable", table->name);
@@ -182,7 +191,11 @@ void test_createTable_success_12cols(void) {
     command->c_colPairs[i].colDef  = strdup("INT"); 
   }
 
-  table = createTable(command);
+  int tableIndex = tables->tableCount;
+
+  tables->tableList[tables->tableCount++] = createTable(tables, command);
+
+  Table* table = tables->tableList[tableIndex];
 
   TEST_ASSERT_NOT_NULL(table);
   TEST_ASSERT_EQUAL_STRING("myTable", table->name);

@@ -58,7 +58,7 @@ void test_two_tables(void) {
 
     stdout = oldStdout;
     fclose(tempOut);
-    remove("temp_output.txt");
+    // remove("temp_output.txt");
 
     int expectedLineCount = sizeof(expectedOutput) / sizeof(expectedOutput[0]);
 
@@ -134,7 +134,7 @@ int main(void) {
     UNITY_BEGIN();
 
 //    RUN_TEST(test_main_output);
-//    RUN_TEST(test_two_tables);
+   RUN_TEST(test_two_tables);
 
     return UNITY_END();
 }
