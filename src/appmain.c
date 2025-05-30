@@ -2,9 +2,15 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+
 #include "repl.h"
 #include "database.h"
 #include "encoder.h"
+
+#define PORT 12345
 
 void printHome() {
   fprintf(stderr, "db > ");
@@ -14,11 +20,25 @@ int appMain() {
   bool isContinue = true;
 
   Tables* tables = loadTablesMetadata("purpleSQL.db");
+
+  // set up TCP socket
+  int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+  struct sockaddr_in address = { .sin_family = AF_INET, .sin_addr = INADDR_ANY, .sin_port = htons(12345) };
+  bind(server_fd, (struct sockaddr*)&address, sizeof(address));
+  listen(server_fd, 3);
+
+  printf("Server running on port 12345\n");
+
   
   while (isContinue) {
+
+    int client_fd = accept(server_fd, NULL, NULL);
+    printf("Accepted new connection\n");
+
     printHome();
     // printf("db > ");
-    char* input = getInput();
+    // char* input = getInput();
+    char* input = getTCPInput(client_fd);
   
     if (!input) {
       printf("Failed to get input\n");
@@ -34,6 +54,7 @@ int appMain() {
           printf("Failed to create table:\n, %s", command->e_message);
         } else {
           tables->tableList[tables->tableCount++] = newTable;
+          send(client_fd, "Table creation successful.\n", 19, 0);
           printf("Table creation successful.\n");
           saveTablesMetadata(tables, "purpleSQL.db");
         }
@@ -79,6 +100,7 @@ int appMain() {
     }
 
   freeCommand(command);
+  close(client_fd);
 
   }
   

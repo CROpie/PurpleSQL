@@ -10,4 +10,6 @@ char* getInput();
 Command* parseInput(char* input);
 void freeCommand(Command* command);
 
+char* getTCPInput(int fd);
+
 #endif

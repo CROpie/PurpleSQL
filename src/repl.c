@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <ctype.h> // isspace
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
 #include "database.h"
 #include "repl.h"
 
@@ -693,6 +696,19 @@ char* getInput() {
 
   // validation to ensure use input was not too long
   return input;
+}
+
+char* getTCPInput(int fd) {
+	static char buffer[128];
+	int bytes_read = recv(fd, buffer, sizeof(buffer) - 1, 0);
+	if (bytes_read <= 0) return NULL;
+
+	buffer[bytes_read] = '\0';
+
+	char* newline = strchr(buffer, '\n');
+	if (newline) *newline = '\0';
+
+	return strdup(buffer);
 }
 
 Command* parseInput(char* input) {
