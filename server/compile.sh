@@ -1,0 +1,1 @@
+g++ src/main.cpp -I./libs/json -o server

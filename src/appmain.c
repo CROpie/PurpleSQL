@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -9,6 +10,11 @@
 #include "repl.h"
 #include "database.h"
 #include "encoder.h"
+
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
 
 #define PORT 12345
 
@@ -22,10 +28,17 @@ int appMain() {
   Tables* tables = loadTablesMetadata("purpleSQL.db");
 
   // set up TCP socket
+
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-  struct sockaddr_in address = { .sin_family = AF_INET, .sin_addr = INADDR_ANY, .sin_port = htons(12345) };
+  // struct sockaddr_in address = { .sin_family = AF_INET, .sin_addr = INADDR_ANY, .sin_port = htons(12345) };
+  struct sockaddr_in address;
+  address.sin_family = AF_INET;
+  address.sin_port = htons(12345);
+  address.sin_addr.s_addr = inet_addr("127.0.0.1");
+
   bind(server_fd, (struct sockaddr*)&address, sizeof(address));
   listen(server_fd, 3);
+
 
   printf("Server running on port 12345\n");
 
@@ -44,6 +57,8 @@ int appMain() {
       printf("Failed to get input\n");
       isContinue = false;
     }
+
+    printf("input: %s\n", input);
 
     Command* command = parseInput(input);
     switch (command->type) {
@@ -70,11 +85,12 @@ int appMain() {
         break;
 
       case CMD_SELECT:
-        Selection* selection = selectColumns(tables, command);
+        Selection* selection = selectColumns(tables, command); 
 
         if (command->type == CMD_ERROR) {
           printf("Failed to retrieve data. %s\n", command->e_message);
         } else {
+          send(client_fd, selection->encodedString, strlen(selection->encodedString), 0);
           freeSelection(selection);
         }
         break;

@@ -65,11 +65,13 @@ typedef struct {
   int columnTypeCount;
   int selectedRowCount;
   int selectCapacity;
+  char* encodedString;
 } Selection;
 
 typedef struct {
   int columnIndex;
   ColumnType columnType;
+  char columnName[32];
 } SelectColumnInfo;
 
 typedef struct {

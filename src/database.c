@@ -40,6 +40,7 @@ void freeSelection(Selection* selection) {
 
   if (selection->selectedRows) free(selection->selectedRows);
   if (selection) free(selection);
+  if (selection->encodedString) free(selection->encodedString);
 }
 
 bool validateCreateTableCommand(Command* command) {
@@ -314,6 +315,58 @@ void printSelection(Table* table, Selection* selection, int columnCount, SelectC
   }
 }
 
+char* encodeSelectionToJSON(Table* table, Selection* selection, int columnCount, SelectColumnInfo* selectColumnInfo) {
+
+  char* buffer = calloc(1024, 1);
+
+  strcat(buffer, "[");
+
+  for (int rowIndex = 0; rowIndex < selection->selectedRowCount; rowIndex++) {
+
+    strcat(buffer, "{");
+
+    for (int colIndex = 0; colIndex < columnCount; colIndex++) {
+
+      char key[64];
+      sprintf(key, "\"%s\":", selectColumnInfo[colIndex].columnName);
+      strcat(buffer, key);
+
+      char value[128];
+      switch (selectColumnInfo[colIndex].columnType) {
+        case COL_INT:
+          sprintf(value, "%d", selection->selectedRows[rowIndex].values[colIndex]->intValue);
+          break;
+        case COL_BOOL:
+          if (selection->selectedRows[rowIndex].values[colIndex]->boolValue) {
+            sprintf(value, "%d", 1);
+          } else {
+            sprintf(value, "%d", 0);
+          }
+          break;
+        case COL_STRING:
+          // printf("DEBUG: string value raw = '%s'\n", selection->selectedRows[rowIndex].values[colIndex]->stringValue);
+          sprintf(value, "\"%s\"", selection->selectedRows[rowIndex].values[colIndex]->stringValue);
+          // printf("DEBUG: encoded value = '%s'\n", value);
+          break;
+        default:
+          printf("Unrecognized column type...\n");
+      }
+      strcat(buffer, value);
+      if (colIndex + 1 != columnCount) {
+        strcat(buffer, ",");
+      }
+    }
+  
+    if (rowIndex + 1 == selection->selectedRowCount) {
+      strcat(buffer, "}");
+    } else {
+      strcat(buffer, "},");
+    }
+  }
+  strcat(buffer, "]");
+  return buffer;
+}
+
 Selection* selectColumns(Tables* tables, Command* command) {
 
   Table* table = NULL;
@@ -389,6 +442,7 @@ Selection* selectColumns(Tables* tables, Command* command) {
       if (strcmp(table->schema.columns[schemaColIndex].name, command->s_colNames[selectColIndex]) == 0) {
         selectColumnInfo[selectColumnInfoCount].columnIndex = schemaColIndex;
         selectColumnInfo[selectColumnInfoCount].columnType = table->schema.columns[schemaColIndex].type;
+        strcpy(selectColumnInfo[selectColumnInfoCount].columnName, command->s_colNames[selectColIndex]);
         selectColumnInfoCount++;
         break;
       }
@@ -513,6 +567,7 @@ Selection* selectColumns(Tables* tables, Command* command) {
   }
 
   printSelection(table, selection, command->s_colNameCount, selectColumnInfo);
+  selection->encodedString = encodeSelectionToJSON(table, selection, command->s_colNameCount, selectColumnInfo);
 
   // free(selectColumnInfo);
   if (whereColumnInfo) free(whereColumnInfo);
