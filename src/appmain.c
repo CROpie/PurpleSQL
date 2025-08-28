@@ -69,7 +69,8 @@ int appMain() {
           printf("Failed to create table:\n, %s", command->e_message);
         } else {
           tables->tableList[tables->tableCount++] = newTable;
-          send(client_fd, "Table creation successful.\n", 19, 0);
+          char* response = "{\"data\":\"Table creation successful\"}";
+          send(client_fd, response, strlen(response), 0);
           printf("Table creation successful.\n");
           saveTablesMetadata(tables, "purpleSQL.db");
         }
@@ -77,6 +78,8 @@ int appMain() {
 
       case CMD_INSERT:
         if (insertRecord(tables, command)) {
+          char* response = "{\"data\":\"Record insertion successful\"}";
+          send(client_fd, response, strlen(response), 0);
           printf("Record insertion successful.\n");
           saveTablesMetadata(tables, "purpleSQL.db");
         } else {
@@ -97,6 +100,8 @@ int appMain() {
 
       case CMD_DROP:
         if (dropTable(tables, command)) {
+          char* response = "{\"data\":\"Table deleted successfully\"}";
+          send(client_fd, response, strlen(response), 0);
           printf("Table deleted.\n");
           saveTablesMetadata(tables, "purpleSQL.db");
         } else {
@@ -113,6 +118,8 @@ int appMain() {
       case CMD_UNDEFINED:
       default:
         printf("Unrecognized command\n");
+        char* response = "{\"data\":\"Unrecognized command\"}";
+        send(client_fd, response, strlen(response), 0);
     }
 
   freeCommand(command);
