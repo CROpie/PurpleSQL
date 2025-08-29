@@ -10,67 +10,75 @@
 #include "repl.h"
 #include "database.h"
 #include "encoder.h"
+#include "appmain.h"
 
 #include <netinet/in.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 
+#include <pthread.h>
+
 #define PORT 12345
 
-void printHome() {
-  fprintf(stderr, "db > ");
-}
+// global lock
+pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int appMain() {
-  bool isContinue = true;
-
-  Tables* tables = loadTablesMetadata("purpleSQL.db");
-
-  // set up TCP socket
+// set up TCP socket
+int startConnection(char* addr, int port) {
 
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-  // struct sockaddr_in address = { .sin_family = AF_INET, .sin_addr = INADDR_ANY, .sin_port = htons(12345) };
   struct sockaddr_in address;
   address.sin_family = AF_INET;
-  address.sin_port = htons(12345);
-  address.sin_addr.s_addr = inet_addr("127.0.0.1");
+  address.sin_port = htons(port);
+  address.sin_addr.s_addr = inet_addr(addr);
 
   bind(server_fd, (struct sockaddr*)&address, sizeof(address));
   listen(server_fd, 3);
 
+  printf("Server running on port %d\n", port);
 
-  printf("Server running on port 12345\n");
+  return server_fd;
+}
 
-  
+void* handle_client(void* arg) {
+
+  ClientArgs* args = (ClientArgs*) arg;
+
+  int client_fd = args->client_fd;
+  Tables* tables = args->tables;
+
+  bool isContinue = true;
+
   while (isContinue) {
 
-    int client_fd = accept(server_fd, NULL, NULL);
-    printf("Accepted new connection\n");
-
-    printHome();
-    // printf("db > ");
-    // char* input = getInput();
     char* input = getTCPInput(client_fd);
   
     if (!input) {
       printf("Failed to get input\n");
-      isContinue = false;
+      break;
     }
 
     printf("input: %s\n", input);
 
     Command* command = parseInput(input);
+
+    // not as efficient as using pthread_rwlock_wrlock(&db_lock) or pthread_rwlock_rdlock(&db_lock) depending on read/write, but good enough
+    // make it so a only one thread can interact with the DB at a time
+    pthread_mutex_lock(&db_mutex);
+
+    char* response = NULL;
+
     switch (command->type) {
 
       case CMD_CREATE:
          Table* newTable = createTable(tables, command);
         if (command->type == CMD_ERROR) {
+          response = "{\"data\":\"Failed to create table\"}";
           printf("Failed to create table:\n, %s", command->e_message);
         } else {
           tables->tableList[tables->tableCount++] = newTable;
-          char* response = "{\"data\":\"Table creation successful\"}";
-          send(client_fd, response, strlen(response), 0);
+          response = "{\"data\":\"Table creation successful\"}";
           printf("Table creation successful.\n");
           saveTablesMetadata(tables, "purpleSQL.db");
         }
@@ -78,11 +86,11 @@ int appMain() {
 
       case CMD_INSERT:
         if (insertRecord(tables, command)) {
-          char* response = "{\"data\":\"Record insertion successful\"}";
-          send(client_fd, response, strlen(response), 0);
+          response = "{\"data\":\"Record insertion successful\"}";
           printf("Record insertion successful.\n");
           saveTablesMetadata(tables, "purpleSQL.db");
         } else {
+          response = "{\"data\":\"Failed to insert row.\"}";
           printf("Failed to insert row. %s\n", command->e_message);
         }
         break;
@@ -91,26 +99,28 @@ int appMain() {
         Selection* selection = selectColumns(tables, command); 
 
         if (command->type == CMD_ERROR) {
+          response = "{\"data\":\"Failed to retrieve data.\"}";
           printf("Failed to retrieve data. %s\n", command->e_message);
         } else {
-          send(client_fd, selection->encodedString, strlen(selection->encodedString), 0);
+          response = strdup(selection->encodedString);  
+          // send(client_fd, selection->encodedString, strlen(selection->encodedString), 0);
           freeSelection(selection);
         }
         break;
 
       case CMD_DROP:
         if (dropTable(tables, command)) {
-          char* response = "{\"data\":\"Table deleted successfully\"}";
-          send(client_fd, response, strlen(response), 0);
+          response = "{\"data\":\"Table deleted successfully\"}";
           printf("Table deleted.\n");
           saveTablesMetadata(tables, "purpleSQL.db");
         } else {
+          response = "{\"data\":\"Failed to drop table.\"}";
           printf("%s\n", command->e_message);
         }
-
         break;
 
       case CMD_EXIT:
+        response = "{\"data\":\"goodbyte\"}";
         printf("goodbyte\n");
         isContinue = false;
         break;
@@ -118,14 +128,61 @@ int appMain() {
       case CMD_UNDEFINED:
       default:
         printf("Unrecognized command\n");
-        char* response = "{\"data\":\"Unrecognized command\"}";
-        send(client_fd, response, strlen(response), 0);
+        response = "{\"data\":\"Unrecognized command\"}\n";
     }
 
-  freeCommand(command);
-  close(client_fd);
+    printf("Out of switch\n");
+
+    if (response != NULL) {
+      ssize_t n = send(client_fd, response, strlen(response), 0);
+      if (n < 0) perror("send failed");
+    } else {
+      printf("Unable to send response\n");
+    }
+
+
+    freeCommand(command);
+    pthread_mutex_unlock(&db_mutex);
+  }
+
+  // this will free the malloc'd args in main
+  free(args);
+  return NULL;
+}
+
+
+int appMain() {
+
+  Tables* tables = loadTablesMetadata("purpleSQL.db");
+
+  int server_fd = startConnection("127.0.0.1", 12345);
+  
+  while (true) {
+
+    int client_fd = accept(server_fd, NULL, NULL);
+
+    if (client_fd < 0) {
+      printf("accept connection failed");
+      continue;
+    }
+
+    printf("Accepted new connection: %dw\n", client_fd);
+
+    ClientArgs* args = malloc(sizeof(ClientArgs));
+    args->client_fd = client_fd;
+    args->tables = tables;
+
+    pthread_t tid;
+
+    // handle_client is recv which will block. It will return here when the socket closes
+    // can only pass args to handle_client bundled into a struct
+    pthread_create(&tid, NULL, handle_client, args);
+
+    pthread_detach(tid);
 
   }
+
+  close(server_fd);
   
 
   // freeTable(table);

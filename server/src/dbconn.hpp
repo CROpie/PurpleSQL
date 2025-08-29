@@ -89,19 +89,6 @@ class Connector {
             return response;
         }
 
-        static void printResponse(json response) {
-            if (response.is_array()) {
-                for (auto element : response) {
-                    if (element.is_object()) {
-                        for (auto [key, value] : element.items()) {
-                            std::cout << key << " = " << value << "\n";
-                        }
-                        std::cout << "---\n";
-                    }
-                }
-            }
-        }
-
     private:
         const char* address;
         const char* port;
