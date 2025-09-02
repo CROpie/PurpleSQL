@@ -38,4 +38,9 @@ int main() {
     "CREATE TABLE testTable (id INT, isDeleted BOOL, message VARCHAR(255));";
     "INSERT INTO testTable (id, isDeleted, message) VALUES (1, false, 'first message'), (2, true, 'second message');"
     "SELECT * FROM testTable;";
+
+
+    CREATE TABLE peanutTable (id INT, word VARCHAR(255));
+    INSERT INTO peanutTable (id, word) VALUES (1, 'purple'), (2, 'peanut');
+
 */
