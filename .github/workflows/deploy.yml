@@ -32,10 +32,10 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          source: "deploy/*"
+          source: "dbInterfaces/proxy/deploy/*"
           target: "/var/www/PurpleSQL/tmp"
           overwrite: true
-          strip_components: 1
+          strip_components: 3
 
   build-and-deploy-database:
     runs-on: ubuntu-22.04
