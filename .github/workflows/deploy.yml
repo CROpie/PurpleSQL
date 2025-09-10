@@ -63,7 +63,7 @@ jobs:
           overwrite: true
           strip_components: 1
 
-  build-and-deploy-database:
+  restart-resources:
     runs-on: ubuntu-22.04
     needs: [build-and-deploy-db-proxy, build-and-deploy-database]
     steps:
