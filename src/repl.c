@@ -699,7 +699,7 @@ char* getInput() {
 }
 
 char* getTCPInput(int fd) {
-	static char buffer[128];
+	static char buffer[1024];
 	int bytes_read = recv(fd, buffer, sizeof(buffer) - 1, 0);
 	if (bytes_read <= 0) return NULL;
 

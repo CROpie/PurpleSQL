@@ -63,7 +63,7 @@ class Connector {
             int bytes = send(db_fd, sql.data(), sql.size(), 0);
             std::cout << "bytes sent: " << bytes << std::endl;
 
-            char buffer[128];
+            char buffer[1024];
             int bytes_read = recv(db_fd, buffer, sizeof(buffer) - 1, 0);
 
             if (bytes_read == 0) {
@@ -73,7 +73,7 @@ class Connector {
 
             buffer[bytes_read] = '\0';
 
-            // std::cout << "return value: " << buffer << std::endl;
+            std::cout << "return value: " << buffer << std::endl;
 
             return json::parse(buffer);
         }
