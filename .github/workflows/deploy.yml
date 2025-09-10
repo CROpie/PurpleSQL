@@ -7,6 +7,36 @@ on:
       - feat/*
 
 jobs:
+  build-and-deploy-db-proxy:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compile code
+        working-directory: ./dbinterfaces/proxy
+        run: |
+          chmod 755 ./compile.sh
+          ./compile.sh
+      
+      - name: Prepare files for deployment
+        working-directory: ./dbinterfaces/proxy
+        run: |
+          mkdir -p deploy
+          cp ./proxy deploy
+
+      - name: Copy to droplet
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          source: "deploy/*"
+          target: "/var/www/PurpleSQL/tmp"
+          overwrite: true
+          strip_components: 1
+
   build-and-deploy-database:
     runs-on: ubuntu-22.04
 
@@ -14,17 +44,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup node
-        uses: actions/setup-node@v3
-        with:
-          node-version: latest
-
       - name: Compile code
         run: make
       
       - name: Prepare files for deployment
         run: |
-          mkdir deploy
+          mkdir -p deploy
           cp build/main.out deploy
 
       - name: Copy to droplet
