@@ -1,0 +1,55 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - feat/*
+
+jobs:
+  build-and-deploy-database:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: latest
+
+      - name: Compile code
+        run: make
+      
+      - name: Prepare files for deployment
+        run: |
+          mkdir deploy
+          cp build/main.out deploy
+
+      - name: Copy to droplet
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          source: "deploy/*"
+          target: "/var/www/PurpleSQL/tmp"
+          overwrite: true
+          strip_components: 1
+
+      - name: Restart backend
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            if tmux has-session -t prod 2>/dev/null; then
+              tmux kill-session -t prod
+            fi
+            cd /var/www/PurpleSQL
+            mv ./tmp/* .
+            rm -rf ./tmp
+            cd ..
+            ./start.sh
